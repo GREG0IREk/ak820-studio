@@ -10,7 +10,7 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parent
-ORDER = ["protocol", "layouts", "keycodes", "image", "mock", "app"]
+ORDER = ["qmk", "protocol", "layouts", "keycodes", "image", "mock", "app"]
 
 IMPORT_RE = re.compile(r"^import\s*\{([^}]*)\}\s*from\s*'\./(\w+)\.js';\s*$", re.M)
 EXPORT_RE = re.compile(r"^export\s+(?:async\s+)?(const|let|function|class)\s+(\w+)", re.M)

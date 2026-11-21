@@ -1,6 +1,7 @@
 // Faux clavier pour la démo (?demo=a ou ?demo=b) et les tests Node.
 // Imite les interfaces WebHID et les réponses observées : rien n'est envoyé à un vrai appareil.
 import { VENDOR_ID, CMD, HEADER_LEN } from './protocol.js';
+import { PAGE_RAW, USAGE_RAW, Q_REPORT, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SLOT_MATRIX, Q_ROWS, Q_COLS, Q_LED_COUNT } from './qmk.js';
 
 class FakeDevice extends EventTarget {
   constructor({ productId, productName, collections, onReport, onFeature, getFeature }) {
@@ -37,12 +38,12 @@ class FakeDevice extends EventTarget {
   }
 }
 
-const col = (usagePage, outBytes, featBytes = 0) => ({
+const col = (usagePage, outBytes, featBytes = 0, usage = 1, inBytes = 64) => ({
   usagePage,
-  usage: 1,
+  usage,
   outputReports: outBytes ? [{ reportId: 0, items: [{ reportSize: 8, reportCount: outBytes }] }] : [],
   featureReports: featBytes ? [{ reportId: 0, items: [{ reportSize: 8, reportCount: featBytes }] }] : [],
-  inputReports: [{ reportId: 0, items: [{ reportSize: 8, reportCount: 64 }] }],
+  inputReports: [{ reportId: 0, items: [{ reportSize: 8, reportCount: inBytes }] }],
 });
 
 /** Famille A : état conservé (effet, LED, touches) pour que la relecture soit cohérente. */
@@ -124,4 +125,65 @@ export function mockFamilyB() {
     onReport(d, dev) { dev.emit(new Uint8Array(64)); },
   });
   return { devices: [control, tft] };
+}
+
+/**
+ * Firmware QMK « Cadran » : imite le canal 0x14 de keymaps/cadran/studio.c.
+ * defaultHids = [[emplacement, code HID]] (disposition ANSI) pour la keymap d'origine.
+ */
+export function mockFamilyQ(defaultHids = []) {
+  const effects = ['Fixe', 'Respiration', 'Vague', 'Arc-en-ciel', 'Spirale', 'Réactif', 'Pluie', 'Chaleur', 'Personnalisé', 'Éteint'];
+  const layerBytes = Q_ROWS * Q_COLS * 2;
+  const factory = new Uint8Array(4 * layerBytes);
+  const put = (map, layer, slot, code) => {
+    const m = SLOT_MATRIX.get(slot);
+    if (!m) return;
+    const o = layer * layerBytes + (m[0] * Q_COLS + m[1]) * 2;
+    map[o] = code >> 8; map[o + 1] = code & 0xff;
+  };
+  for (let l = 1; l < 4; l += 2) for (const slot of SLOT_MATRIX.keys()) put(factory, l, slot, 0x0001);
+  for (const [slot, hid] of defaultHids) {
+    const code = hid === 175 ? 0x5221 : hid;
+    put(factory, 0, slot, code);
+    put(factory, 2, slot, hid === 175 ? 0x5223 : code);
+  }
+  put(factory, 1, 0, 0x7c00); put(factory, 3, 0, 0x7c00);
+  const state = {
+    keymap: factory.slice(), factory, light: [0, 20, 255, 160, 128], max: 200, sleep: 1, minutes: [1, 3, 5, 10, 0],
+    perkey: new Uint8Array(Q_LED_COUNT * 3).fill(255), clock: null,
+  };
+  const device = new FakeDevice({
+    productId: 0x8009,
+    productName: 'AK820 PRO',
+    collections: [col(PAGE_RAW, Q_REPORT, 0, USAGE_RAW, Q_REPORT)],
+    onReport(d, dev) {
+      const r = d.slice(0, Q_REPORT), a = (i) => d[3 + i];
+      const refuse = () => { r[0] = 0xff; };
+      if (d[0] !== 0x07) refuse();
+      else if (d[1] === CH_CLOCK && d[2] === 1) state.clock = Array.from(d.slice(3, 10));
+      else if (d[1] === CH_SYS && d[2] === 2) { r.fill(0, 3); r.set(new TextEncoder().encode('cadran-1.1 (démo)'), 3); }
+      else if (d[1] !== CH_STUDIO) refuse();
+      else {
+        switch (d[2]) {
+          case QC.INFO: r.fill(0, 3); r.set([1, effects.length, 4, Q_ROWS, Q_COLS, Q_LED_COUNT, 5, state.sleep, 8, 0, 87, ...state.minutes], 3); break;
+          case QC.EFFECT_NAME: r.fill(0, 4); if (a(0) < effects.length) r.set(new TextEncoder().encode(effects[a(0)]), 4); else refuse(); break;
+          case QC.LIGHT_GET: r.set([...state.light, state.max], 3); break;
+          case QC.LIGHT_SET: state.light = [a(0), a(1), a(2), Math.min(a(3), state.max), a(4)]; break;
+          case QC.SLEEP_SET: if (a(0) < 5) state.sleep = a(0); else refuse(); break;
+          case QC.KEYMAP_GET: case QC.KEYMAP_DEFAULT: {
+            const off = (a(0) << 8) | a(1), src = d[2] === QC.KEYMAP_GET ? state.keymap : state.factory;
+            r.set(src.slice(off, off + a(2)), 6); break;
+          }
+          case QC.KEY_SET: { const o = a(0) * layerBytes + (a(1) * Q_COLS + a(2)) * 2; state.keymap[o] = a(3); state.keymap[o + 1] = a(4); break; }
+          case QC.MATRIX: r.fill(0, 3); break;
+          case QC.PERKEY_GET: r.set(state.perkey.slice(a(0) * 3, (a(0) + a(1)) * 3), 5); break;
+          case QC.PERKEY_SET: state.perkey.set(d.slice(5, 5 + a(1) * 3), a(0) * 3); break;
+          case QC.PERKEY_SAVE: if (a(0)) state.light[0] = 8; if (a(1) !== 0xff) state.light[3] = a(1); break;
+          default: refuse();
+        }
+      }
+      dev.emit(r);
+    },
+  });
+  return { devices: [device], state };
 }

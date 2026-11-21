@@ -104,6 +104,7 @@ h2 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
 .note { font-size: 13px; color: var(--muted); }
 .note.warn { color: var(--danger); }
 .hidden { display: none !important; }
+.field.off { opacity: 0.4; pointer-events: none; transition: opacity 0.2s; }
 
 /* ---------- boutons */
 .btn {
@@ -177,6 +178,8 @@ input[type='search'] { width: 100%; min-height: 38px; padding: 0 12px; border-ra
 .key.sel > span { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
 .key.mod > span { background: var(--accent-soft); border-color: var(--accent); font-weight: 650; }
 .key.na > span { opacity: 0.35; }
+.key.down > span { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+#km-test[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
 .screen-mark { position: absolute; right: 0; top: -5%; }
 
 /* ---------- écran */

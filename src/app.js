@@ -2,12 +2,13 @@
 import {
   VENDOR_ID, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, CONTROL_USAGE_PAGES, FAMILY_A,
   MODES, supportedDirections, classify, Keyboard, TFT_SIZE, LEGACY_MAX_FRAMES, parseHex,
-  defaultKeymap, LEGACY_KEY_SLOTS,
+  defaultKeymap,
 } from './protocol.js';
 import { LAYOUTS } from './layouts.js';
 import { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } from './keycodes.js';
 import { decodeFile, renderFrame, toPixels } from './image.js';
-import { mockFamilyA, mockFamilyB } from './mock.js';
+import { mockFamilyA, mockFamilyB, mockFamilyQ } from './mock.js';
+import { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid } from './qmk.js';
 
 // ------------------------------------------------------------ outils
 
@@ -140,11 +141,15 @@ const state = {
   pkColor: store.get('pkColor', '#ff2d2d'),
   pkBrightness: store.get('pkBrightness', 5),
   tft: { frames: [], fileName: '', opts: store.get('tftOpts', { fit: 'cover', zoom: 1, offsetX: 0, offsetY: 0, background: '#000000', speed: 1 }), encoded: [] },
-  km: { layer: 'base', device: { base: null, fn: null }, draft: { base: null, fn: null }, selected: null },
+  km: { layer: 'base', device: {}, draft: {}, factory: {}, selected: null, testing: false },
   logOn: false,
   log: [],
 };
 const layout = () => LAYOUTS[state.layoutId] || LAYOUTS['iso-fr'];
+const isQ = () => !!state.kb && state.kb.family === FAMILY_Q;
+const lightKey = () => (isQ() ? 'lightQ' : 'light');
+const modes = () => (state.kb ? state.kb.caps.modes : MODES.map((m) => ({ ...m, noSpeed: m.id <= 1 })));
+const modeInfo = (id) => modes().find((m) => m.id === id) || {};
 if (!state.pk || state.pk.length !== 128) state.pk = Array.from({ length: 128 }, () => [0, 0, 0]);
 
 // ------------------------------------------------------------ navigation
@@ -198,7 +203,7 @@ function initLighting() {
   const box = $('#effects');
   box.innerHTML = '';
   previews.length = 0;
-  for (const m of MODES) {
+  for (const m of modes()) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'effect';
@@ -209,7 +214,7 @@ function initLighting() {
     b.appendChild(document.createTextNode(m.name));
     b.onclick = () => { state.light.mode = m.id; lightingChanged(); };
     box.appendChild(b);
-    previews.push({ mode: m.key, ctx: c.getContext('2d') });
+    previews.push({ mode: m.key, rainbow: m.rainbow, ctx: c.getContext('2d') });
   }
   const levels = [0, 1, 2, 3, 4, 5].map((v) => ({ value: v, label: String(v) }));
   seg($('#light-brightness'), levels, state.light.brightness, (v) => { state.light.brightness = v; lightingChanged(); });
@@ -224,12 +229,16 @@ function initLighting() {
 function refreshLightingUi() {
   const L = state.light;
   $$('#effects .effect').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.mode === L.mode)));
-  const dirs = supportedDirections(L.mode);
+  const dirs = isQ() ? [] : supportedDirections(L.mode);
+  const info = modeInfo(L.mode);
+  const caps = state.kb ? state.kb.caps : { rainbowOption: true };
+  $('#light-rainbow').closest('.field').classList.toggle('hidden', !caps.rainbowOption);
+  $('#light-colors').closest('.field').classList.toggle('off', !!info.noColor || (caps.rainbowOption && !!L.colorMode));
   const labels = { left: 'Gauche', right: 'Droite', up: 'Haut', down: 'Bas' };
   if (dirs.length && !dirs.includes(L.direction)) L.direction = dirs[0];
   seg($('#light-direction'), dirs.map((d) => ({ value: d, label: labels[d] })), L.direction, (v) => { L.direction = v; lightingChanged(); });
   $('#dir-reveal').classList.toggle('open', dirs.length > 0);
-  $$('#light-speed button').forEach((b) => (b.disabled = L.mode <= 1)); // Éteint, Fixe : pas d'animation
+  $$('#light-speed button').forEach((b) => (b.disabled = !!info.noSpeed)); // Éteint, Fixe : pas d'animation
   const live = state.kb && state.kb.caps.liveLighting;
   $('#light-apply-row').classList.toggle('hidden', !!live);
   $('#lighting-lead').textContent = live
@@ -239,7 +248,7 @@ function refreshLightingUi() {
 
 let lightTimer;
 function lightingChanged() {
-  store.set('light', state.light);
+  store.set(lightKey(), state.light);
   refreshLightingUi();
   if (state.kb && state.kb.caps.liveLighting) {
     clearTimeout(lightTimer);
@@ -280,6 +289,8 @@ function effectColor(mode, x, y, t, base, rainbow) {
     case 'pulsating': return dim(col(x), Math.abs(Math.sin(t * 3)));
     case 'tilt': return dim(col(x + y), 0.5 + 0.5 * Math.sin((x + y) * 8 - t * 3));
     case 'shuttle': { const k = 0.5 + 0.5 * Math.sin(t * 1.5); return dim(col(x), 1 - Math.abs(x - k) * 6); }
+    case 'heat': { const p = rnd(Math.floor(x * 16), Math.floor(y * 4)); const k = Math.max(0, Math.sin(t * 1.3 + p * 9)); return hsv(0.66 - 0.66 * k, 1, 0.3 + 0.7 * k); }
+    case 'custom': return state.pk[Math.floor(y * 3) * 16 + Math.floor(x * 12)] || [0, 0, 0];
     default: return base;
   }
 }
@@ -295,7 +306,7 @@ function previewLoop(on) {
     for (const p of previews) {
       for (let y = 0; y < 4; y++) {
         for (let x = 0; x < 16; x++) {
-          const c = effectColor(p.mode, x / 15, y / 3, t, base, !!state.light.colorMode).map((v) => Math.round(v * (0.25 + 0.75 * k)));
+          const c = effectColor(p.mode, x / 15, y / 3, t, base, p.rainbow ?? !!state.light.colorMode).map((v) => Math.round(v * (0.25 + 0.75 * k)));
           p.ctx.fillStyle = `rgb(${c})`;
           p.ctx.fillRect(x * 4, y * 4, 3, 3);
         }
@@ -340,7 +351,7 @@ function preset(name) {
 }
 function paintPerKey() {
   if (!pkEls) return;
-  const b = state.kb && state.kb.family !== FAMILY_A;
+  const slots = state.kb && state.kb.caps.perKeySlots;
   for (const k of layout().keys) {
     const el = pkEls.get(k.slot);
     const c = state.pk[k.slot] || [0, 0, 0];
@@ -350,7 +361,7 @@ function paintPerKey() {
     span.style.background = off ? '' : rgbToHex(c);
     span.style.color = off ? '' : lum(c) > 140 ? '#111' : '#fff';
     span.style.borderColor = off ? '' : 'transparent';
-    el.classList.toggle('na', b && k.slot === 98);
+    el.classList.toggle('na', !!slots && !slots.has(k.slot));
   }
 }
 
@@ -373,7 +384,9 @@ function initScreen() {
   }
   colorRow($('#tft-bg'), o.background, (c) => { o.background = c; tftChanged(); }, ['#000000', '#ffffff', '#1a1a2e', '#5b4cdb']);
   $('#tft-send').onclick = (e) => sendScreen(e.currentTarget);
-  $('#tft-clock').onclick = (e) => run(e.currentTarget, () => state.kb.syncClock(new Date()), 'Horloge réglée sur ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+  const syncClock = (e) => run(e.currentTarget, () => state.kb.syncClock(new Date()), 'Horloge réglée sur ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+  $('#tft-clock').onclick = syncClock;
+  $('#tft-clock-q').onclick = syncClock;
   $('#tft-factory').onclick = (e) => run(e.currentTarget, () => state.kb.tftFactory(), 'Animation d\'origine rétablie');
   const ctx = tftCanvas.getContext('2d');
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, TFT_SIZE, TFT_SIZE);
@@ -447,8 +460,14 @@ async function sendScreen(btn) {
 let kmEls;
 function hidLabels() {
   const m = new Map();
-  for (const k of layout().keys) if (k.label && !m.has(k.hid)) m.set(k.hid, k.label.replace(/\n/g, ' '));
+  for (const k of layout().keys) if (k.label && !m.has(k.hid) && (!isQ() || isBasicHid(k.hid))) m.set(k.hid, k.label.replace(/\n/g, ' '));
   m.set(44, 'Espace');
+  return m;
+}
+/** Libellés pour l'affichage : en ISO, « \\ » (0x31, keymap QMK ANSI) donne le même caractère que « * µ » (0x32). */
+function displayLabels() {
+  const m = hidLabels();
+  if (!m.has(0x31) && m.has(0x32)) m.set(0x31, m.get(0x32));
   return m;
 }
 function initKeymap() {
@@ -456,27 +475,65 @@ function initKeymap() {
     if (!keyRemappable(slot)) { toast('Cette touche n\'est pas réaffectable sur ce firmware.'); return; }
     state.km.selected = slot; renderKeymap(); renderPicker();
   });
-  segBind($('#km-layer'), state.km.layer, (v) => { state.km.layer = v; state.km.selected = null; ensureKeymap(); renderKeymap(); renderPicker(); });
+  bindLayers();
   $('#km-search').oninput = renderPicker;
   $('#km-revert').onclick = () => { const L = state.km.layer; state.km.draft[L] = state.km.device[L].map((a) => ({ ...a })); renderKeymap(); renderPicker(); };
   $('#km-factory').onclick = (e) => run(e.currentTarget, async () => {
     state.km.draft[state.km.layer] = await state.kb.getKeymap(state.km.layer, true);
     renderKeymap(); renderPicker();
   }, 'Valeurs d\'usine chargées : vérifiez puis écrivez sur le clavier');
+  $('#km-test').onclick = () => keyTest(!state.km.testing);
   $('#km-write').onclick = (e) => run(e.currentTarget, async () => {
     const L = state.km.layer;
-    await state.kb.setKeymap(L, state.km.draft[L]);
+    await state.kb.setKeymap(L, state.km.draft[L], state.km.device[L]);
     if (state.kb.caps.keymapRead) state.km.device[L] = await state.kb.getKeymap(L);
     else { state.km.device[L] = state.km.draft[L].map((a) => ({ ...a })); store.set('keymapB.' + L, state.km.device[L]); }
     state.km.draft[L] = state.km.device[L].map((a) => ({ ...a }));
     renderKeymap();
   }, 'Touches enregistrées sur le clavier');
 }
-const keyRemappable = (slot) => !state.kb || state.kb.caps.keymapRead || LEGACY_KEY_SLOTS.has(slot);
+function bindLayers() {
+  const layers = state.kb ? state.kb.caps.layers : [{ id: 'base', label: 'Couche normale' }, { id: 'fn', label: 'Couche Fn' }];
+  if (!layers.some((l) => l.id === state.km.layer)) state.km.layer = 'base';
+  $('#km-layer').innerHTML = layers.map((l) => `<button type="button" data-v="${l.id}">${l.label}</button>`).join('');
+  segBind($('#km-layer'), state.km.layer, (v) => { state.km.layer = v; state.km.selected = null; ensureKeymap(); renderKeymap(); renderPicker(); });
+}
+const keyRemappable = (slot) => { const s = state.kb && state.kb.caps.remapSlots; return !s || s.has(slot); };
+
+/** Test des touches (firmware QMK) : surligne les touches enfoncées et donne leur position. */
+let testTimer = 0;
+function keyTest(on) {
+  state.km.testing = on && !!state.kb && state.kb.caps.matrixTest;
+  $('#km-test').setAttribute('aria-pressed', String(state.km.testing));
+  clearTimeout(testTimer);
+  const note = $('#km-test-note');
+  if (!state.km.testing) { note.textContent = ''; kmEls && kmEls.forEach((el) => el.classList.remove('down')); return; }
+  note.textContent = 'Appuyez sur des touches du clavier.';
+  const bySlot = new Map([...SLOT_MATRIX].map(([slot, [r, c]]) => [`${r},${c}`, slot]));
+  const tick = async () => {
+    if (!state.km.testing || !state.kb || state.view !== 'keymap') { keyTest(false); return; }
+    try {
+      const down = await state.kb.matrix();
+      const slots = new Set(down.map(([r, c]) => bySlot.get(`${r},${c}`)).filter((x) => x !== undefined));
+      kmEls.forEach((el, slot) => el.classList.toggle('down', slots.has(slot)));
+      if (down.length) {
+        note.textContent = down.map(([r, c]) => {
+          const key = layout().keys.find((k) => k.slot === bySlot.get(`${r},${c}`));
+          return `ligne ${r}, colonne ${c}${key ? ` (${key.label || 'Espace'})` : ' (hors du plan)'}`;
+        }).join(' ; ');
+      }
+    } catch (e) { note.textContent = e.message; }
+    testTimer = setTimeout(tick, 80);
+  };
+  tick();
+}
 async function ensureKeymap() {
   if (!state.kb || !state.kb.caps.keymap) return;
   const L = state.km.layer;
   if (state.km.device[L]) return renderKeymap();
+  if (isQ() && !state.km.factory[L]) {
+    await run(null, async () => { state.km.factory[L] = await state.kb.getKeymap(L, true); });
+  }
   if (!state.kb.caps.keymapRead) {
     // Pas de relecture : on repart de ce qui a été écrit depuis ce navigateur.
     const saved = store.get('keymapB.' + L, null);
@@ -493,15 +550,17 @@ async function ensureKeymap() {
 function renderKeymap() {
   if (!kmEls) return;
   const L = state.km.layer, draft = state.km.draft[L], dev = state.km.device[L];
-  const labels = hidLabels();
+  const labels = displayLabels();
   let changed = 0;
   for (const k of layout().keys) {
     const el = kmEls.get(k.slot);
     const a = draft && draft[k.slot];
-    const isDefault = !a || a.kind === 'default' || (a.kind === 'keyboard' && a.usage === k.hid);
+    const fac = state.km.factory[L];
+    const isDefault = isQ() ? !a || !fac || sameAction(a, fac[k.slot]) : !a || a.kind === 'default' || (a.kind === 'keyboard' && a.usage === k.hid);
     const diff = draft && dev && !sameAction(a, dev[k.slot]);
     if (diff) changed++;
-    el.firstChild.textContent = isDefault ? k.label : actionLabel(a, labels);
+    if (isQ()) el.firstChild.textContent = !a ? k.label : a.code === KC_TRNS ? '' : actionLabel(a, labels);
+    else el.firstChild.textContent = isDefault ? k.label : actionLabel(a, labels);
     el.classList.toggle('mod', !isDefault);
     el.classList.toggle('sel', state.km.selected === k.slot);
     el.classList.toggle('na', !keyRemappable(k.slot));
@@ -517,11 +576,21 @@ function renderPicker() {
   const key = layout().keys.find((k) => k.slot === slot);
   $('#km-search').disabled = !key;
   if (!key || !state.km.draft[L]) { box.innerHTML = ''; $('#km-title').textContent = 'Aucune touche choisie'; return; }
-  $('#km-title').textContent = `Touche « ${key.label || 'Espace'} »${L === 'fn' ? ' avec Fn' : ''}`;
-  const q = $('#km-search').value.trim().toLowerCase();
+  const layerName = (state.kb.caps.layers.find((l) => l.id === L) || {}).label || '';
+  $('#km-title').textContent = `Touche « ${key.label || 'Espace'} »${L === 'base' ? '' : ` (${layerName})`}`;
+  const search = $('#km-search').value.trim().toLowerCase();
   const cur = state.km.draft[L][slot];
   const labels = hidLabels();
-  const groups = [
+  const fac = state.km.factory[L];
+  const q = (list) => list.map(([c, l]) => [{ kind: 'qmk', code: c }, l]);
+  const groups = isQ() ? [
+    ['Origine', fac && fac[slot] ? [[fac[slot], `${fac[slot].code === KC_TRNS ? 'Transparent' : actionLabel(fac[slot], labels)} (origine)`]] : []],
+    ['Touches du clavier', q([...labels])],
+    ['Autres touches', q(EXTRA_KEYS)],
+    ['Multimédia', q(QMK_MEDIA)],
+    ['Éclairage', q(QMK_LIGHTING)],
+    ['Clavier', q(QMK_KEYBOARD)],
+  ] : [
     ['Origine', [[state.kb.caps.keymapRead ? { kind: 'keyboard', usage: key.hid } : { kind: 'default' }, `${key.label || 'Espace'} (origine)`]]],
     ['Touches du clavier', [...labels].map(([u, l]) => [{ kind: 'keyboard', usage: u }, l])],
     ['Autres touches', EXTRA_KEYS.map(([u, l]) => [{ kind: 'keyboard', usage: u }, l])],
@@ -530,7 +599,7 @@ function renderPicker() {
   ];
   box.innerHTML = '';
   for (const [title, items] of groups) {
-    const shown = items.filter(([, l]) => !q || l.toLowerCase().includes(q));
+    const shown = items.filter(([, l]) => !search || l.toLowerCase().includes(search));
     if (!shown.length) continue;
     const h = document.createElement('h3'); h.textContent = title; box.appendChild(h);
     const list = document.createElement('div'); list.className = 'list';
@@ -589,11 +658,12 @@ async function loadInfo() {
   const info = await kb.info().catch((e) => ({ error: e.message }));
   state.info = info;
   const rows = [['Modèle', kb.name], ['Identifiant USB', `${VENDOR_ID.toString(16).padStart(4, '0')}:${kb.pid.toString(16).padStart(4, '0')}`],
-    ['Firmware', kb.family === FAMILY_A ? `famille A (0xFF68)${info.firmware ? ', version ' + info.firmware : ''}` : 'famille B (0xFF13)']];
+    ['Firmware', kb.family === FAMILY_Q ? `QMK Cadran${info.firmware ? ' (' + info.firmware + ')' : ''}` : kb.family === FAMILY_A ? `famille A (0xFF68)${info.firmware ? ', version ' + info.firmware : ''}` : 'famille B (0xFF13)']];
   if (info.error) rows.push(['Lecture', info.error]);
   if (info.batteryLevel !== undefined && info.batteryLevel !== null) rows.push(['Batterie', `${info.batteryLevel} %${info.chargeStatus ? ', en charge' : ''}`]);
+  else if (isQ()) rows.push(['Batterie', 'inconnue (connecté par câble)']);
   else if (info.wiredFull) rows.push(['Batterie', 'pleine ou alimenté par câble']);
-  rows.push(['Écran', kb.tft ? 'accessible' : 'interface non autorisée']);
+  rows.push(['Écran', isQ() ? 'horloge et menu de la molette' : kb.tft ? 'accessible' : 'interface non autorisée']);
   if (info.tftMaxFrames) rows.push(['Images par animation', String(info.tftMaxFrames)]);
   $('#sys-info').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${String(v).replace(/</g, '&lt;')}</dd>`).join('');
 
@@ -620,7 +690,7 @@ function hexLog(dir, bytes, ep) {
 
 // ------------------------------------------------------------ connexion
 
-const FILTERS = [...CONTROL_USAGE_PAGES.slice(0, 1), PAGE_TFT_A, PAGE_FEATURE].map((usagePage) => ({ vendorId: VENDOR_ID, usagePage }));
+const FILTERS = [...CONTROL_USAGE_PAGES.slice(0, 1), PAGE_TFT_A, PAGE_FEATURE, PAGE_RAW].map((usagePage) => ({ vendorId: VENDOR_ID, usagePage }));
 
 async function grantedDevices() {
   if (state.demo) return null;
@@ -634,11 +704,14 @@ async function connect(devices) {
   const kb = new Keyboard(cls, (dir, bytes, ep) => hexLog(dir, bytes, ep));
   try { await kb.open(); }
   catch (e) {
-    toast('Le clavier refuse la connexion : fermez le logiciel Ajazz ou un autre onglet qui l\'utilise. (' + e.message + ')', true);
+    await kb.close();
+    if (cls.family === FAMILY_Q) toast(e.message, true);
+    else toast('Le clavier refuse la connexion : fermez le logiciel Ajazz ou un autre onglet qui l\'utilise. (' + e.message + ')', true);
     return false;
   }
   state.kb = kb;
-  state.km = { layer: state.km.layer, device: { base: null, fn: null }, draft: { base: null, fn: null }, selected: null };
+  keyTest(false);
+  state.km = { layer: state.km.layer, device: {}, draft: {}, factory: {}, selected: null, testing: false };
   onConnected();
   return true;
 }
@@ -653,12 +726,18 @@ async function onConnected() {
   $('#keymap-unsupported').classList.toggle('hidden', kb.caps.keymapRead);
   $('#keymap-body').classList.toggle('hidden', !kb.caps.keymap);
   $('#tft-factory').classList.toggle('hidden', !kb.caps.tftBuiltIn);
-  $('#pk-read').classList.toggle('hidden', kb.family !== FAMILY_A);
+  $('#pk-read').classList.toggle('hidden', !kb.caps.perKeyRead);
+  $('#screen-upload').classList.toggle('hidden', !kb.caps.tftUpload);
+  $('#screen-q').classList.toggle('hidden', kb.caps.tftUpload);
+  $('#km-test-row').classList.toggle('hidden', !kb.caps.matrixTest);
+  bindLayers();
+  if (isQ()) state.light = { ...state.light, ...store.get('lightQ', {}) };
+  initLighting();
   $('#pk-iso-note').classList.toggle('hidden', kb.family === FAMILY_A || state.layoutId === 'ansi');
   const banner = $('#banner');
   banner.innerHTML = '';
-  if (state.demo) banner.innerHTML = `<div class="banner">${ICON_INFO}<span>Mode démo : un faux clavier (famille ${kb.family}) répond aux commandes. <a href="?">Quitter la démo</a></span></div>`;
-  else if (!kb.tft) {
+  if (state.demo) banner.innerHTML = `<div class="banner">${ICON_INFO}<span>Mode démo : un faux clavier (${kb.family === FAMILY_Q ? 'firmware Cadran' : 'famille ' + kb.family}) répond aux commandes. <a href="?">Quitter la démo</a></span></div>`;
+  else if (!kb.tft && kb.caps.tftUpload) {
     banner.innerHTML = `<div class="banner warn">${ICON_INFO}<span>L'interface de l'écran n'a pas été autorisée. <button class="btn" id="grant-tft" style="margin-left:8px">Autoriser l'écran</button></span></div>`;
     $('#grant-tft').onclick = async () => {
       const extra = await navigator.hid.requestDevice({ filters: [PAGE_TFT_A, PAGE_TFT_B].map((usagePage) => ({ vendorId: VENDOR_ID, usagePage })) });
@@ -670,8 +749,9 @@ async function onConnected() {
   paintPerKey();
   if (state.tft.encoded.length) $('#tft-send').disabled = false;
   await loadInfo();
-  const cur = await kb.getLighting();
-  if (cur && MODES.some((m) => m.id === cur.mode)) { state.light = { ...state.light, ...cur }; initLighting(); }
+  const cur = await kb.getLighting().catch(() => null);
+  if (cur && kb.caps.modes.some((m) => m.id === cur.mode)) { state.light = { ...state.light, ...cur }; store.set(lightKey(), state.light); initLighting(); }
+  if (kb.caps.perKeyRead && isQ()) { const pk = await kb.getPerKey().catch(() => null); if (pk) { state.pk = pk; store.set('perkey', pk); paintPerKey(); } }
 }
 
 function onDisconnected() {
@@ -710,7 +790,9 @@ function boot() {
   $$('#nav button').forEach((b) => (b.disabled = true));
 
   if (state.demo) {
-    const devs = state.demo === 'b' ? mockFamilyB().devices : mockFamilyA(LAYOUTS['iso-fr'].keys.map((k) => [k.slot, k.hid])).devices;
+    const devs = state.demo === 'b' ? mockFamilyB().devices
+      : state.demo === 'q' ? mockFamilyQ(LAYOUTS.ansi.keys.map((k) => [k.slot, k.hid])).devices
+      : mockFamilyA(LAYOUTS['iso-fr'].keys.map((k) => [k.slot, k.hid])).devices;
     connect(devs);
     return;
   }

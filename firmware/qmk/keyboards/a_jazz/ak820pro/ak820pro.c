@@ -314,6 +314,12 @@ static bool sys_command(uint8_t *data, uint8_t length) {
     return true;
 }
 
+// Canal 0x14 d'AK820 Studio (éclairage, touches, couleurs par touche). Défini par
+// le keymap « cadran » (keymaps/cadran/studio.c) ; ailleurs, rien n'est traité.
+__attribute__((weak)) bool ak820_studio_command(uint8_t *data, uint8_t length) {
+    return false;
+}
+
 static inline bool rtc_is_set_time_cmd(const uint8_t *data, uint8_t length) {
     return length >= 10 && data[0] == RTC_SET_VALUE &&
            data[1] == RTC_CHANNEL && data[2] == RTC_SET_TIME;
@@ -333,6 +339,7 @@ void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
         return;
     }
     if (sys_command(data, length)) return;
+    if (ak820_studio_command(data, length)) return;
     data[0] = RTC_UNHANDLED;
 }
 
@@ -345,6 +352,8 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         media_hid_command(data, length);   // now-playing state (channel 0x12)
     } else if (sys_command(data, length)) {
         // traité (version ou redémarrage programmé)
+    } else if (ak820_studio_command(data, length)) {
+        // traité par le canal AK820 Studio
     } else {
         data[0] = RTC_UNHANDLED;
     }

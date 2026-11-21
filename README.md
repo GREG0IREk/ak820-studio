@@ -1,6 +1,6 @@
 # AK820 Studio
 
-Réglages de l'Ajazz / Epomaker AK820 Pro dans Chrome ou Edge, sans installer le logiciel Ajazz.
+Réglages de l'Ajazz / Epomaker AK820 Pro dans Chrome ou Edge, sans installer le logiciel Ajazz. Fonctionne avec le firmware d'origine et avec le firmware QMK « Cadran » de ce dépôt.
 
 - Éclairage : les 20 effets, couleur ou arc-en-ciel, luminosité, vitesse, direction.
 - Couleurs touche par touche, avec un clavier AZERTY ou QWERTY dessiné.
@@ -23,24 +23,27 @@ echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="0c45", MODE="0660", TAG+="uaccess"' |
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
-`?demo=a` ou `?demo=b` à la fin de l'adresse ouvre un faux clavier pour essayer l'interface.
+`?demo=q` (firmware Cadran), `?demo=a` ou `?demo=b` à la fin de l'adresse ouvre un faux clavier pour essayer l'interface.
 
-## Deux familles de firmware
+## Trois firmwares
 
 Les AK820 Pro n'ont pas tous le même protocole. L'application le détecte d'après les interfaces USB :
 
-| | Famille A | Famille B |
-|---|---|---|
-| Interfaces | contrôle `0xFF68`, écran `0xFF67` | contrôle `0xFF13`, écran `0xFF68` |
-| Éclairage, couleurs par touche, écran, horloge, veille | oui | oui |
-| Réaffectation des touches | oui | écriture seule (commandes 0x11 et 0x27, relevées dans le pilote Windows 1.0.0.5), sauf « < > » |
-| Envoi | immédiat | à la demande (chaque envoi s'écrit en flash) |
+| | Ajazz famille A | Ajazz famille B | QMK Cadran (1.1 ou plus) |
+|---|---|---|---|
+| Interfaces | contrôle `0xFF68`, écran `0xFF67` | contrôle `0xFF13`, écran `0xFF68` | HID brut QMK `0xFF60` |
+| Éclairage | 20 effets, direction | 20 effets, direction | les 10 effets du menu de l'écran |
+| Couleurs par touche | lecture et écriture | écriture | lecture et écriture (effet « Personnalisé ») |
+| Écran | image ou GIF, horloge | image ou GIF, horloge | horloge seulement (l'écran affiche l'interface Cadran) |
+| Réaffectation des touches | 2 couches, lecture et écriture | 2 couches, écriture seule, sauf « < > » | 4 couches (Windows, Mac, et leur couche Fn), lecture, écriture, valeurs d'origine ; test des touches |
+| Veille | oui | oui | 1, 3, 5, 10 min ou jamais |
+| Envoi | immédiat | à la demande (chaque envoi s'écrit en flash) | immédiat |
 
-Sur la famille B, la correspondance des LED par touche n'est connue que pour la disposition ANSI.
+Sur la famille B et sous Cadran, la correspondance des LED par touche n'est connue que pour la disposition ANSI : la touche ISO « < > » n'a pas de LED pilotée. Sous Cadran, sa position dans la matrice est supposée (ligne 4, colonne 1) : le bouton « Tester les touches » de la page Touches affiche la position réelle de chaque touche enfoncée.
 
 ## Micrologiciel QMK « Cadran »
 
-Pour remplacer le micrologiciel Ajazz par QMK avec une nouvelle interface d'écran (heure, menu à la molette pour l'éclairage) : [firmware/README.md](firmware/README.md). AK820 Studio ne fonctionne plus une fois QMK installé.
+Pour remplacer le micrologiciel Ajazz par QMK avec une nouvelle interface d'écran (heure, menu à la molette pour l'éclairage) : [firmware/README.md](firmware/README.md). Depuis la version 1.1, AK820 Studio règle aussi ce firmware (canal HID `0x14`, décrit dans `firmware/qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/studio.c`). Cadran 1.0 n'a pas ce canal : l'application demande alors de mettre le firmware à jour.
 
 ## Développement
 
@@ -50,7 +53,8 @@ python3 -m http.server 8820   # index.html charge les sources de src/ directemen
 node --test test/protocol.test.mjs
 ```
 
-- `src/protocol.js` : trames, encodages, transactions des deux familles (sans DOM, testé sous Node).
+- `src/protocol.js` : trames, encodages, transactions des trois firmwares (sans DOM, testé sous Node).
+- `src/qmk.js` : firmware Cadran : paquets, correspondance touches / matrice / LED, codes de touche QMK.
 - `src/app.js` : interface. `src/image.js` : décodage et cadrage des images. `src/mock.js` : faux claviers.
 
 ## Origine du protocole

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AK820 Studio</title>
-<meta name="description" content="Réglages de l'Ajazz AK820 Pro dans le navigateur : éclairage, couleurs par touche, écran, réaffectation des touches.">
+<meta name="description" content="Réglages de l'Ajazz AK820 Pro dans le navigateur, firmware Ajazz ou QMK Cadran : éclairage, couleurs par touche, écran, réaffectation des touches.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b4cdb' stroke-width='2' stroke-linecap='round'%3E%3Crect x='2' y='6' width='20' height='13' rx='2'/%3E%3Cpath d='M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="src/style.css">
 </head>
@@ -95,6 +95,11 @@
     <!-- Écran -->
     <section class="view" id="view-screen">
       <h1>Écran</h1>
+      <div class="card hidden" id="screen-q">
+        <p>Avec le firmware Cadran, l'écran affiche l'heure, la date, la connexion et la batterie, et le menu de la molette (appui long). Il n'a pas de mémoire pour une image : l'envoi d'images est réservé au firmware Ajazz.</p>
+        <div class="row" style="margin-top: 16px;"><button class="btn primary" id="tft-clock-q">Mettre l'horloge à l'heure</button></div>
+      </div>
+      <div id="screen-upload">
       <p class="lead">Image ou GIF animé sur l'écran 128 × 128. Le cadrage et les couleurs de l'aperçu sont ceux de l'écran.</p>
       <div class="card">
         <div class="tft-wrap">
@@ -131,6 +136,7 @@
           </div>
         </div>
       </div>
+      </div>
     </section>
 
     <!-- Touches -->
@@ -145,6 +151,10 @@
             <span class="note" id="km-count"></span>
           </div>
           <div class="deck"><div class="kb pick" id="km-kb"></div></div>
+          <div class="row hidden" id="km-test-row" style="margin-top: 14px;">
+            <button class="btn" id="km-test" aria-pressed="false">Tester les touches</button>
+            <span class="note" id="km-test-note"></span>
+          </div>
           <div class="row end" style="margin-top: 16px;">
             <button class="btn" id="km-factory">Valeurs d'usine</button>
             <button class="btn" id="km-revert" disabled>Annuler</button>
@@ -198,7 +208,7 @@
           </ol>
           <div class="row" style="margin-top: 18px;">
             <button class="btn primary" id="welcome-connect">Connecter</button>
-            <a class="btn" href="?demo=a">Essayer sans clavier</a>
+            <a class="btn" href="?demo=q">Essayer sans clavier</a>
           </div>
           <p class="note warn hidden" id="no-webhid" style="margin-top: 16px;"></p>
         </div>

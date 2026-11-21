@@ -1,4 +1,5 @@
 // Actions proposées dans la réaffectation des touches.
+import { qmkKeyLabel } from './qmk.js';
 
 /** Touches absentes du clavier mais utiles (codes HID, page clavier 0x07). */
 export const EXTRA_KEYS = [
@@ -41,6 +42,7 @@ export function actionLabel(a, hidLabels) {
       const m = MOUSE.find(([u]) => u === a.button);
       return m ? m[1] : `Souris ${a.button}`;
     }
+    case 'qmk': return qmkKeyLabel(a.code, (u) => hidLabels.get(u) || (EXTRA_KEYS.find(([x]) => x === u) || [])[1]);
     default: return `Code ${a.bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ')}`;
   }
 }
@@ -52,6 +54,7 @@ export function sameAction(a, b) {
     case 'keyboard': return a.usage === b.usage;
     case 'consumer': return a.value === b.value;
     case 'mouse': return a.button === b.button && (a.value ?? 0) === (b.value ?? 0);
+    case 'qmk': return a.code === b.code;
     default: return a.bytes.join() === b.bytes.join();
   }
 }

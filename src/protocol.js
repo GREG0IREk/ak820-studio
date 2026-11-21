@@ -5,7 +5,13 @@
 // Deux familles de firmware incompatibles, reconnues par leurs interfaces HID :
 //   A : contrôle 0xFF68 (rapports de sortie 64 o, trames AA/55), écran 0xFF67 (4104 o)
 //   B : contrôle 0xFF13 (rapports feature 64 o, préfixe 04), écran 0xFF68 (4096 o)
+//   Q : firmware QMK « Cadran » de ce dépôt, HID brut 0xFF60 (voir qmk.js)
 // Ce module ne touche pas au DOM : il est testé sous Node (test/protocol.test.mjs).
+import {
+  FAMILY_Q, PAGE_RAW, USAGE_RAW, Q_REPORT, Q_REFUSED, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SYS_VERSION,
+  Q_KEYMAP_CHUNK, Q_PERKEY_CHUNK, Q_LAYERS, SLOT_MATRIX, SLOT_LED, qFrame, qClockArgs, qParseInfo, qString,
+  qDecodeLayer, qEffectInfo, rgbToHsv8, hsv8ToRgb,
+} from './qmk.js';
 
 export const VENDOR_ID = 0x0c45;
 export const PRODUCT_IDS = [0x8009, 0x800a, 0xfefe];
@@ -426,6 +432,12 @@ const pagesOf = (dev) => (dev.collections || []).map((c) => c.usagePage);
 export function classify(devices) {
   const ak = devices.filter((d) => d.vendorId === VENDOR_ID && PRODUCT_IDS.includes(d.productId));
   if (!ak.length) return { error: 'Aucun AK820 parmi les appareils autorisés.' };
+  // Firmware QMK : HID brut 0xFF60 / 0x61 en rapports de 32 octets (Ajazz : 64 octets).
+  const raw = ak.find((d) => (d.collections || []).some((c) => c.usagePage === PAGE_RAW && c.usage === USAGE_RAW && reportBytes(c, 'outputReports') === Q_REPORT));
+  if (raw) {
+    if (!/^AK820/i.test(raw.productName || '')) return { error: `Interface QMK trouvée sur « ${raw.productName || 'sans nom'} » : ce n'est pas un AK820, rien n'est envoyé.` };
+    return { family: FAMILY_Q, control: raw, tft: null };
+  }
   const has = (page) => ak.find((d) => pagesOf(d).includes(page));
   const feature = has(PAGE_FEATURE);
   const tftA = has(PAGE_TFT_A);
@@ -528,6 +540,7 @@ export class Keyboard {
     this.mutex = new Mutex();
     this.name = cls.control.productName || 'AK820';
     this.pid = cls.control.productId;
+    this.qmeta = null;
     const tftCol = cls.tft && (cls.tft.collections || []).find((c) => c.usagePage === (this.family === FAMILY_A ? PAGE_TFT_A : PAGE_TFT_B));
     this.tftReportLen = (tftCol && reportBytes(tftCol, 'outputReports')) || (this.family === FAMILY_A ? 4104 : 4096);
   }
@@ -535,6 +548,7 @@ export class Keyboard {
   async open() {
     await this.control.open();
     if (this.tft && this.tft !== this.control) await this.tft.open();
+    if (this.family === FAMILY_Q) await this.mutex.run(() => this.qLoadMeta());
   }
   async close() {
     await this.control.close().catch(() => {});
@@ -542,8 +556,82 @@ export class Keyboard {
   }
 
   get caps() {
+    if (this.family === FAMILY_Q) {
+      const m = this.qmeta;
+      return {
+        info: true, keymap: true, keymapRead: true, perKey: m.perkeyEffect !== null, perKeyRead: true, perKeySlots: new Set(SLOT_LED.keys()),
+        tft: false, tftUpload: false, tftBuiltIn: false, clock: true, liveLighting: true, secondary: false, rainbowOption: false,
+        modes: m.effects, layers: Q_LAYERS.slice(0, m.layers), remapSlots: new Set(SLOT_MATRIX.keys()), matrixTest: true,
+        sleep: m.sleepMinutes.map((min, i) => ({ value: i, label: min ? `${min} min` : 'Jamais' })),
+      };
+    }
     const a = this.family === FAMILY_A;
-    return { info: a, keymap: true, keymapRead: a, perKey: true, perKeyIsoComplete: a, tft: !!this.tft, tftBuiltIn: a, liveLighting: a, secondary: a, sleep: a ? SLEEP_A : SLEEP_B };
+    const modes = MODES.map((m) => ({ ...m, noSpeed: m.id <= 1 }));
+    const perKeySlots = a ? null : LEGACY_KEY_SLOTS;
+    return {
+      info: a, keymap: true, keymapRead: a, perKey: true, perKeyRead: a, perKeySlots, perKeyIsoComplete: a, tft: !!this.tft, tftUpload: true,
+      tftBuiltIn: a, clock: true, liveLighting: a, secondary: a, rainbowOption: true, modes,
+      layers: [{ id: 'base', label: 'Couche normale' }, { id: 'fn', label: 'Couche Fn' }], remapSlots: a ? null : LEGACY_KEY_SLOTS,
+      matrixTest: false, sleep: a ? SLEEP_A : SLEEP_B,
+    };
+  }
+
+  // ---- firmware QMK : primitives
+
+  /** Envoie un paquet [0x07, canal, cmd, …] et attend sa réponse ; erreur si refusé ou muet. */
+  async qCall(channel, cmd, args = [], timeout = 600) {
+    this.control.drain();
+    await this.control.send(qFrame(channel, cmd, args));
+    const r = await this.control.waitInput((d) => d[1] === channel && d[2] === cmd, timeout);
+    if (!r) throw new Error(`Pas de réponse du clavier (canal 0x${channel.toString(16)}, commande 0x${cmd.toString(16)})`);
+    if (r[0] === Q_REFUSED) {
+      if (channel === CH_STUDIO && cmd === QC.INFO) throw new Error('Ce firmware QMK ne connaît pas AK820 Studio : installez Cadran 1.1 ou plus récent (dossier firmware du dépôt).');
+      throw new Error(`Commande refusée par le clavier (canal 0x${channel.toString(16)}, commande 0x${cmd.toString(16)})`);
+    }
+    return r;
+  }
+  async qLoadMeta() {
+    const info = qParseInfo(await this.qCall(CH_STUDIO, QC.INFO));
+    const effects = [];
+    for (let i = 0; i < info.effectCount; i++) {
+      const r = await this.qCall(CH_STUDIO, QC.EFFECT_NAME, [i]);
+      effects.push(qEffectInfo(qString(r.slice(4)), i));
+    }
+    let version = '';
+    try { version = qString((await this.qCall(CH_SYS, SYS_VERSION)).slice(3)); } catch { /* version facultative */ }
+    const maxBrightness = (await this.qCall(CH_STUDIO, QC.LIGHT_GET))[8] || 255;
+    this.qmeta = { ...info, effects, version, maxBrightness };
+    return this.qmeta;
+  }
+  qLayerIndex(layer) {
+    const i = Q_LAYERS.findIndex((l) => l.id === layer);
+    if (i < 0 || i >= this.qmeta.layers) throw new Error(`Couche inconnue : ${layer}`);
+    return i;
+  }
+  async qReadLayer(layer, factory) {
+    const { rows, cols } = this.qmeta;
+    const size = rows * cols * 2, base = this.qLayerIndex(layer) * size;
+    const out = new Uint8Array(size);
+    for (let off = 0; off < size; off += Q_KEYMAP_CHUNK) {
+      const n = Math.min(Q_KEYMAP_CHUNK, size - off), at = base + off;
+      const r = await this.qCall(CH_STUDIO, factory ? QC.KEYMAP_DEFAULT : QC.KEYMAP_GET, [at >> 8, at & 0xff, n]);
+      out.set(r.slice(6, 6 + n), off);
+    }
+    return qDecodeLayer(out, cols);
+  }
+
+  /** Touches enfoncées : liste de [ligne, colonne] (test des touches). */
+  matrix() {
+    return this.mutex.run(async () => {
+      if (this.family !== FAMILY_Q) return [];
+      const r = await this.qCall(CH_STUDIO, QC.MATRIX, [], 300);
+      const down = [];
+      for (let row = 0; row < this.qmeta.rows; row++) {
+        const bits = r[3 + 2 * row] | (r[4 + 2 * row] << 8);
+        for (let col = 0; col < this.qmeta.cols; col++) if (bits & (1 << col)) down.push([row, col]);
+      }
+      return down;
+    });
   }
 
   // ---- famille A : primitives
@@ -627,6 +715,10 @@ export class Keyboard {
 
   info() {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) {
+        const m = await this.qLoadMeta();
+        return { family: 'Q', firmware: m.version, batteryLevel: m.battery, sleepIndex: m.sleepIndex };
+      }
       if (this.family === FAMILY_A) {
         const r = await this.aGetMany(CMD.GET_DEVICE_INFO, 48);
         return { family: 'A', ...parseDeviceInfo(r) };
@@ -643,6 +735,12 @@ export class Keyboard {
   /** Effet actuel (famille A, lecture seule). null si le firmware ne répond pas. */
   getLighting() {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) {
+        const a = (await this.qCall(CH_STUDIO, QC.LIGHT_GET)).slice(3);
+        const max = a[5] || 255;
+        const hex = '#' + hsv8ToRgb(a[1], a[2]).map((v) => v.toString(16).padStart(2, '0')).join('');
+        return { mode: a[0], color: hex, colorMode: 0, brightness: Math.round((a[3] / max) * 5), speed: Math.round(a[4] / 51), direction: 'left' };
+      }
       if (this.family !== FAMILY_A) return null;
       try {
         const p = await this.aGetMany(CMD.GET_LED_EFFECT, 16);
@@ -656,6 +754,13 @@ export class Keyboard {
 
   setLighting(cfg) {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) {
+        const [h, s] = rgbToHsv8(parseHex(cfg.color) || [255, 255, 255]);
+        const max = this.qmeta.maxBrightness;
+        const v = Math.round((clamp(cfg.brightness, 0, 5) / 5) * max);
+        await this.qCall(CH_STUDIO, QC.LIGHT_SET, [cfg.mode, h, s, v, clamp(cfg.speed, 0, 5) * 51, 1]);
+        return;
+      }
       if (this.family === FAMILY_A) return this.aSet(CMD.SET_LED_EFFECT, ledEffectPayload(cfg));
       return this.bTransaction(1, controlPacket(B.LIGHTING, 0, 1), [legacyLightingPacket(cfg)]);
     });
@@ -664,6 +769,17 @@ export class Keyboard {
   /** Écrit les couleurs par touche (tableau de 128 [r,g,b]) puis active le mode personnalisé. */
   setPerKey(colors, brightness = 5) {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) {
+        const leds = Array.from({ length: this.qmeta.leds }, () => [0, 0, 0]);
+        for (const [slot, led] of SLOT_LED) if (led < leds.length) leds[led] = colors[slot] || [0, 0, 0];
+        for (let i = 0; i < leds.length; i += Q_PERKEY_CHUNK) {
+          const part = leds.slice(i, i + Q_PERKEY_CHUNK);
+          await this.qCall(CH_STUDIO, QC.PERKEY_SET, [i, part.length, ...part.flat()]);
+        }
+        const max = this.qmeta.maxBrightness;
+        await this.qCall(CH_STUDIO, QC.PERKEY_SAVE, [1, Math.round((clamp(brightness, 1, 5) / 5) * max)]);
+        return;
+      }
       if (this.family === FAMILY_A) {
         await this.aSetMany(CMD.SET_CUSTOM_LED_DATA, encodeCustomLeds(colors), 0, true);
         return this.aSet(CMD.SET_LED_EFFECT, ledEffectPayload({ mode: MODE_CUSTOM, color: '#ffffff', brightness, speed: 0, direction: 'left', colorMode: 0 }));
@@ -678,6 +794,17 @@ export class Keyboard {
 
   getPerKey() {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) {
+        const leds = [];
+        for (let i = 0; i < this.qmeta.leds; i += Q_PERKEY_CHUNK) {
+          const n = Math.min(Q_PERKEY_CHUNK, this.qmeta.leds - i);
+          const r = await this.qCall(CH_STUDIO, QC.PERKEY_GET, [i, n]);
+          for (let k = 0; k < n; k++) leds.push(Array.from(r.slice(5 + 3 * k, 8 + 3 * k)));
+        }
+        const colors = Array.from({ length: 128 }, () => [0, 0, 0]);
+        for (const [slot, led] of SLOT_LED) if (leds[led]) colors[slot] = leds[led];
+        return colors;
+      }
       if (this.family !== FAMILY_A) throw new Error('Lecture impossible sur ce firmware');
       return decodeCustomLeds(await this.aGetMany(CMD.GET_CUSTOM_LED_DATA, 512));
     });
@@ -685,6 +812,7 @@ export class Keyboard {
 
   syncClock(date = new Date()) {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) { await this.qCall(CH_CLOCK, 0x01, qClockArgs(date).slice(1)); return; }
       if (this.family === FAMILY_A) return this.aSet(CMD.SET_TEMPORARY_COMMAND_DATA, clockPayload(date));
       return this.bTransaction(1, controlPacket(B.CLOCK, 0, 1), [legacyClockPacket(date)]);
     });
@@ -692,6 +820,7 @@ export class Keyboard {
 
   getSleep() {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) return qParseInfo(await this.qCall(CH_STUDIO, QC.INFO)).sleepIndex;
       if (this.family !== FAMILY_A) return null; // pas de relecture connue
       const gm = await this.aGetMany(CMD.GET_GAME_MODE, 56);
       return gm[3];
@@ -700,6 +829,7 @@ export class Keyboard {
 
   setSleep(value) {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) { await this.qCall(CH_STUDIO, QC.SLEEP_SET, [value]); return; }
       if (this.family === FAMILY_A) {
         const gm = await this.aGetMany(CMD.GET_GAME_MODE, 56); // on ne change que la veille
         gm[3] = value;
@@ -712,6 +842,7 @@ export class Keyboard {
   /** Famille B : aucune relecture connue ; les valeurs d'usine sont « tout à 0 ». */
   getKeymap(layer = 'base', factory = false) {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) return this.qReadLayer(layer, factory);
       if (this.family !== FAMILY_A) {
         if (factory) return defaultKeymap();
         throw new Error('Ce firmware ne permet pas de relire les touches');
@@ -723,8 +854,19 @@ export class Keyboard {
     });
   }
 
-  setKeymap(layer, slots) {
+  /** Firmware QMK : seules les touches qui diffèrent de `previous` sont écrites (si fourni). */
+  setKeymap(layer, slots, previous = null) {
     return this.mutex.run(async () => {
+      if (this.family === FAMILY_Q) {
+        const L = this.qLayerIndex(layer);
+        for (const [slot, [r, c]] of SLOT_MATRIX) {
+          const a = slots[slot];
+          if (!a || a.kind !== 'qmk') continue;
+          if (previous && previous[slot] && previous[slot].code === a.code) continue;
+          await this.qCall(CH_STUDIO, QC.KEY_SET, [L, r, c, a.code >> 8, a.code & 0xff]);
+        }
+        return;
+      }
       if (this.family !== FAMILY_A) {
         const table = legacyEncodeKeymap(slots);
         const blocks = [];

@@ -2,7 +2,7 @@
 
 Micrologiciel QMK pour l'écran et la molette de l'AK820 Pro. Il part du portage QMK de [fpb](https://github.com/fpb/qmk_firmware/tree/ak820pro-lcd-embedded) (branche `ak820pro-lcd-embedded`, commit `75d2d9b`) et remplace son interface d'écran par celle de la maquette « Cadran ».
 
-Il remplace le micrologiciel Ajazz. AK820 Studio (l'application web de ce dépôt) ne fonctionne plus une fois QMK installé : le protocole n'est pas le même.
+Il remplace le micrologiciel Ajazz. Depuis la version 1.1, AK820 Studio (l'application web de ce dépôt) le règle par l'USB : éclairage, couleurs par touche, touches, veille, horloge (voir « AK820 Studio » plus bas). La version 1.0 n'était pas réglable par le site.
 
 ## Ce qu'il fait
 
@@ -22,7 +22,7 @@ Il remplace le micrologiciel Ajazz. AK820 Studio (l'application web de ce dépô
 Sans action pendant 15 s, le menu se referme et garde le réglage en cours.
 
 **Réglages du menu**
-- Effet : Fixe, Respiration, Vague, Arc-en-ciel, Spirale, Réactif, Pluie, Chaleur, Éteint.
+- Effet : Fixe, Respiration, Vague, Arc-en-ciel, Spirale, Réactif, Pluie, Chaleur, Personnalisé (couleurs par touche envoyées depuis AK820 Studio), Éteint.
 - Luminosité : 0 à 100 %, par pas de 10.
 - Vitesse : 1 à 5.
 - Couleur : teinte par pas de 20°.
@@ -75,8 +75,9 @@ Le script attend le mode flash (2 min par défaut, `-WaitSeconds` pour changer),
 Une fois Cadran installé, la même commande suffit : `flash.ps1` envoie d'abord `ak820-maj boot`, qui fait redémarrer le clavier en mode flash par l'USB. Le câble doit être branché.
 
 ```
-ak820-maj version    # affiche la version installée (ex. cadran-1.0)
+ak820-maj version    # affiche la version installée (ex. cadran-1.1)
 ak820-maj boot       # passe en mode flash
+ak820-maj info       # état lu par le canal d'AK820 Studio (1.1 et plus), sans rien modifier
 ```
 
 Ces deux commandes passent par le canal HID brut de QMK (page `0xFF60`), avec le cadre des commandes de VIA : `[0x07, 0x13, 0x01, "BOOT"]` pour le redémarrage, `[0x07, 0x13, 0x02]` pour la version.
@@ -101,11 +102,38 @@ Le script télécharge Space Grotesk (Google Fonts), dessine les icônes à part
 | `qmk/keyboards/a_jazz/ak820pro/graphics/display.c` | interface Cadran : accueil, menu, réglages, anneau |
 | `qmk/keyboards/a_jazz/ak820pro/ak820pro.c` | fichier du portage + délai de veille réglable + commandes système HID |
 | `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/` | keymap : molette (volume, sourdine, menu), effet Réactif |
+| `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/studio.c` | canal HID d'AK820 Studio (éclairage, touches, couleurs par touche, veille) |
+| `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/rgb_matrix_user.inc` | effet « Personnalisé » |
 | `qmk/keyboards/a_jazz/ak820pro/graphics/res_cadran/` | polices et icônes générées |
 | `assets/` | génération des polices et icônes |
 | `tools/ak820-maj.c` | outil PC : version, passage en mode flash |
 | `tools/flash.ps1` | flash complet depuis Windows |
 | `tools/sonixflasher/hidapi-windows.patch` | correctif de SonixFlasherC pour Windows |
+
+## AK820 Studio (depuis 1.1)
+
+Ouvrir AK820 Studio ([site](https://greg0irek.github.io/ak820-studio/) ou `dist/ak820-studio.html`) dans Chrome ou Edge, clavier branché en USB, puis « Connecter » et choisir « AK820 PRO ».
+
+| Page | Sous Cadran |
+|---|---|
+| Éclairage | les effets du menu de l'écran, couleur, luminosité, vitesse ; envoi immédiat et enregistré |
+| Touche par touche | couleurs par touche, lues et écrites ; l'envoi passe le clavier sur l'effet « Personnalisé » |
+| Écran | mise à l'heure de l'horloge (l'écran garde l'interface Cadran, pas d'envoi d'image) |
+| Touches | 4 couches (Windows, Windows + Fn, Mac, Mac + Fn), lecture, écriture des seules touches modifiées, retour aux valeurs d'origine ; « Tester les touches » affiche la position de chaque touche enfoncée |
+| Système | version, batterie, délai de veille |
+
+Un changement fait depuis le site s'affiche aussi dans le menu de l'écran s'il est ouvert.
+
+Le site passe par le HID brut de QMK (page `0xFF60`), canal `0x14`, avec le même cadre que l'horloge (`[0x07, 0x14, commande, …]`, 32 octets). Les commandes sont décrites en tête de `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/studio.c`.
+
+Ce que la 1.1 change dans le firmware :
+- keymap modifiable (`DYNAMIC_KEYMAP_ENABLE`) : la keymap compilée sert de valeurs d'origine, la keymap active est en EEPROM ;
+- effet « Personnalisé » (`rgb_matrix_user.inc`), couleurs dans le bloc utilisateur de l'EEPROM ;
+- EEPROM émulée portée de 1 à 2 Ko (4 Ko de flash) pour loger le tout.
+
+**Passage de 1.0 à 1.1 : l'EEPROM repart de zéro.** L'EEPROM émulée change de taille et d'emplacement en flash : effet, couleur, luminosité, délai de veille et dernier profil Bluetooth reviennent aux valeurs par défaut au premier démarrage. Les appareils appairés en Bluetooth sont gardés par la puce radio, pas par ce firmware.
+
+La touche ISO « < > » n'existe pas dans le portage fpb (clavier ANSI). Sa position est supposée en ligne 4, colonne 1 ; elle n'a pas d'action par défaut. Le test des touches du site confirme sa position, puis la page Touches permet de lui donner une action.
 
 ## Mise à jour sans fil (dongle 2,4 GHz ou Bluetooth)
 
@@ -125,6 +153,7 @@ Une erreur à l'étape 1 coupe le sans-fil jusqu'à reprogrammation à la sonde.
 - Passage en mode flash depuis le micrologiciel Ajazz : commande HFD sur l'interface 3 (`SF_IFACE=8009:3 … -r hfd`). Le clavier est ensuite apparu en `0c45:7140` et le QMK `ak820pro-lcd-embedded` v1 de fpb a été écrit par un script de surveillance qui attendait ce mode. Le journal de ce script a été perdu : le moment exact du passage n'est pas documenté.
 - Écran v1 confirmé (bon sens, bonnes couleurs).
 - Cadran 1.0 : passage en mode flash par Fn+Échap (le QMK de fpb ne connaît pas `ak820-maj boot`), puis `flash.ps1`. Écriture vérifiée par le bootloader ; la dernière somme de contrôle échoue parce que le clavier a déjà redémarré. `flash.ps1` juge donc sur le redémarrage et la version (`cadran-1.0`). Il a fallu éteindre et rallumer le clavier après le flash.
+- Cadran 1.1 (même jour) : passage en mode flash par `ak820-maj boot`, sans toucher au clavier. `flash.ps1` lancé avec sa sortie redirigée vers un journal s'est arrêté sur la première ligne d'erreur du flasheur, avant l'écriture : PowerShell 5 transforme la sortie d'erreur redirigée en erreur, et le script arrête tout à la première erreur. Le clavier est resté en mode flash, sans dommage, et le flasheur lancé directement a écrit et vérifié le firmware. `flash.ps1` passe désormais par `Invoke-Tool`, qui laisse passer la sortie d'erreur des outils. `ak820-maj info` : 10 effets, 4 couches, keymap active identique à la keymap d'origine ; l'EEPROM est repartie de zéro comme prévu.
 
 ## Licences
 

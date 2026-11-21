@@ -37,6 +37,14 @@ void display_menu_close(void);   // valide un réglage en cours et revient à l'
 void display_menu_rotate(bool clockwise);
 void display_menu_press(void);
 
+// Effets du menu, partagés avec le canal HID d'AK820 Studio (même liste, même ordre).
+uint8_t     display_effect_count(void);
+const char *display_effect_name(uint8_t index);
+uint8_t     display_effect_current(void);
+void        display_effect_apply(uint8_t index, bool save);
+int8_t      display_effect_perkey(void);       // index de « Personnalisé », -1 si absent
+void        display_settings_changed(void);   // réglages changés depuis le PC : menu à jour
+
 // Délai de veille réglable depuis le menu (défini dans ak820pro.c, mémorisé en EEPROM).
 #define AK820_SLEEP_CHOICES 5
 uint8_t ak820_get_sleep_index(void);

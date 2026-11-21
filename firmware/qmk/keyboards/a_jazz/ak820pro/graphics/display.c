@@ -97,6 +97,9 @@ static const effect_t EFFECTS[] = {
 #endif
     {RGB_MATRIX_JELLYBEAN_RAINDROPS, "Pluie"},
     {RGB_MATRIX_TYPING_HEATMAP, "Chaleur"},
+#ifdef AK820_STUDIO_PERKEY
+    {RGB_MATRIX_CUSTOM_perso, "Personnalisé"},
+#endif
     {0, "Éteint"},
 };
 #define EFFECT_COUNT ((uint8_t)(sizeof(EFFECTS) / sizeof(EFFECTS[0])))
@@ -566,6 +569,50 @@ void display_menu_press(void) {
         commit_values();
         go(SCR_MENU);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Effets : API pour le canal HID d'AK820 Studio
+
+uint8_t display_effect_count(void) {
+    return EFFECT_COUNT;
+}
+
+const char *display_effect_name(uint8_t index) {
+    return index < EFFECT_COUNT ? EFFECTS[index].name : "";
+}
+
+uint8_t display_effect_current(void) {
+    return effect_index_now();
+}
+
+void display_effect_apply(uint8_t index, bool save) {
+    if (index >= EFFECT_COUNT) return;
+    if (index == EFFECT_OFF) {
+        if (save) rgb_matrix_disable(); else rgb_matrix_disable_noeeprom();
+        return;
+    }
+    if (save) {
+        rgb_matrix_enable();
+        rgb_matrix_mode(EFFECTS[index].mode);
+    } else {
+        rgb_matrix_enable_noeeprom();
+        rgb_matrix_mode_noeeprom(EFFECTS[index].mode);
+    }
+}
+
+int8_t display_effect_perkey(void) {
+#ifdef AK820_STUDIO_PERKEY
+    for (uint8_t i = 0; i < EFFECT_OFF; i++)
+        if (EFFECTS[i].mode == RGB_MATRIX_CUSTOM_perso) return (int8_t)i;
+#endif
+    return -1;
+}
+
+void display_settings_changed(void) {
+    if (screen == SCR_HOME || display_paused) return;
+    load_values();
+    redraw(true);
 }
 
 // ---------------------------------------------------------------------------

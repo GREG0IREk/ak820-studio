@@ -3,7 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as P from '../src/protocol.js';
-import { mockFamilyA, mockFamilyB } from '../src/mock.js';
+import { mockFamilyA, mockFamilyB, mockFamilyQ } from '../src/mock.js';
+import * as Q from '../src/qmk.js';
+import { actionLabel } from '../src/keycodes.js';
 import { LAYOUTS } from '../src/layouts.js';
 
 const arr = (u8, a, b) => Array.from(u8.slice(a, b));
@@ -261,4 +263,131 @@ test('famille B : FINISH envoyé même après un refus', async () => {
   await assert.rejects(kb.setLighting({ mode: 4, color: '#ffffff', brightness: 5, speed: 3 }));
   const cmds = devices[0].sent.map((s) => s.data[1]);
   assert.deepEqual(cmds, [0x18, 0x13, 0xf0]);
+});
+
+// ---------------------------------------------------------------- firmware QMK Cadran
+
+const ansiHids = () => LAYOUTS.ansi.keys.map((k) => [k.slot, k.hid]);
+async function openQ() {
+  const mock = mockFamilyQ(ansiHids());
+  const kb = new P.Keyboard(P.classify(mock.devices));
+  await kb.open();
+  return { kb, mock, sent: mock.devices[0].sent };
+}
+
+test('QMK : détection par le HID brut 0xFF60 en 32 octets', () => {
+  const { devices } = mockFamilyQ();
+  const cls = P.classify(devices);
+  assert.equal(cls.family, 'Q');
+  devices[0].productName = 'Autre clavier';
+  assert.match(P.classify(devices).error, /pas un AK820/);
+});
+
+test('QMK : cadre des paquets et horloge', () => {
+  assert.deepEqual(arr(Q.qFrame(0x14, 0x07, [1, 2, 3]), 0, 7), [7, 0x14, 7, 1, 2, 3, 0]);
+  assert.equal(Q.qFrame(0x14, 1).length, 32);
+  assert.deepEqual(Q.qClockArgs(new Date(2026, 10, 21, 16, 40, 41)), [1, 26, 11, 21, 6, 16, 40, 41]);
+});
+
+test('QMK : correspondances emplacement / matrice / LED', () => {
+  assert.equal(Q.SLOT_MATRIX.size, 82);
+  const seen = new Set([...Q.SLOT_MATRIX.values()].map(([r, c]) => r * 16 + c));
+  assert.equal(seen.size, 82, 'positions uniques');
+  for (const k of LAYOUTS.ansi.keys) assert.ok(Q.SLOT_MATRIX.has(k.slot), `ANSI ${k.label}`);
+  assert.equal(Q.SLOT_LED.size, 81, 'toutes les touches ANSI ont une LED');
+  assert.equal(Q.SLOT_LED.has(98), false, '« < > » sans LED connue');
+  assert.equal(Q.SLOT_LED.get(0), 0);
+  assert.equal(Q.SLOT_LED.get(91), 80);
+});
+
+test('QMK : couleurs HSV', () => {
+  assert.deepEqual(Q.rgbToHsv8([255, 0, 0]), [0, 255, 255]);
+  assert.deepEqual(Q.hsv8ToRgb(0, 255), [255, 0, 0]);
+  const [h, s] = Q.rgbToHsv8([0x8b, 0x5c, 0xff]);
+  const back = Q.hsv8ToRgb(h, s);
+  assert.ok(back.every((v, i) => Math.abs(v - [0x8b, 0x5c, 0xff][i]) <= 3), back.join());
+});
+
+test('QMK : métadonnées, effets et version', async () => {
+  const { kb } = await openQ();
+  assert.equal(kb.caps.modes.length, 10);
+  assert.equal(kb.caps.modes[8].name, 'Personnalisé');
+  assert.equal(kb.caps.modes[0].noSpeed, true);
+  assert.deepEqual(kb.caps.sleep.map((o) => o.label), ['1 min', '3 min', '5 min', '10 min', 'Jamais']);
+  assert.equal(kb.caps.layers.length, 4);
+  const info = await kb.info();
+  assert.equal(info.firmware, 'cadran-1.1 (démo)');
+  assert.equal(info.batteryLevel, 87);
+});
+
+test('QMK : éclairage lu puis écrit', async () => {
+  const { kb, mock } = await openQ();
+  const cur = await kb.getLighting();
+  assert.equal(cur.mode, 0);
+  assert.equal(cur.brightness, 4);
+  await kb.setLighting({ mode: 1, color: '#ff0000', brightness: 5, speed: 2 });
+  assert.deepEqual(mock.state.light, [1, 0, 255, 200, 102]);
+  await kb.setLighting({ mode: 1, color: '#ff0000', brightness: 0, speed: 0 });
+  assert.equal(mock.state.light[3], 0);
+});
+
+test('QMK : keymap lue, origine, écriture des seules différences', async () => {
+  const { kb, mock, sent } = await openQ();
+  const base = await kb.getKeymap('base');
+  assert.equal(base[33].code, 0x14, 'Q');
+  assert.equal(base[85].code, 0x5221, 'Fn = MO(1)');
+  const fn = await kb.getKeymap('fn', true);
+  assert.equal(fn[0].code, 0x7c00);
+  assert.equal(fn[33].code, Q.KC_TRNS);
+  const draft = base.map((a) => a && { ...a });
+  draft[48] = { kind: 'qmk', code: 0x29 };    // Verr Maj -> Échap
+  sent.length = 0;
+  await kb.setKeymap('base', draft, base);
+  assert.equal(sent.length, 1);
+  assert.deepEqual(arr(sent[0].data, 0, 8), [7, 0x14, 0x07, 0, 3, 0, 0, 0x29]);
+  assert.equal((await kb.getKeymap('base'))[48].code, 0x29);
+  assert.equal((await kb.getKeymap('base', true))[48].code, 0x39, 'origine inchangée');
+  await assert.rejects(kb.getKeymap('autre'));
+});
+
+test('QMK : couleurs par touche', async () => {
+  const { kb, mock } = await openQ();
+  const colors = Array.from({ length: 128 }, (_, i) => [i, 255 - i, 7]);
+  await kb.setPerKey(colors, 5);
+  assert.deepEqual(Array.from(mock.state.perkey.slice(0, 3)), [0, 255, 7]);
+  assert.deepEqual(Array.from(mock.state.perkey.slice(80 * 3, 81 * 3)), [91, 164, 7]);
+  assert.equal(mock.state.light[0], 8, 'effet Personnalisé choisi');
+  const back = await kb.getPerKey();
+  assert.deepEqual(back[91], [91, 164, 7]);
+  assert.deepEqual(back[98], [0, 0, 0]);
+});
+
+test('QMK : veille, horloge, test des touches, refus', async () => {
+  const { kb, mock } = await openQ();
+  await kb.setSleep(4);
+  assert.equal(await kb.getSleep(), 4);
+  await kb.syncClock(new Date(2026, 10, 21, 16, 40, 41));
+  assert.deepEqual(mock.state.clock, [26, 11, 21, 6, 16, 40, 41]);
+  assert.deepEqual(await kb.matrix(), []);
+  await assert.rejects(kb.setSleep(9), /refusée/);
+});
+
+test('QMK : firmware sans canal Studio', async () => {
+  const mock = mockFamilyQ();
+  const orig = mock.devices[0].onReport;
+  mock.devices[0].onReport = (d, dev) => { if (d[1] === 0x14) { const r = d.slice(); r[0] = 0xff; dev.emit(r); } else orig(d, dev); };
+  const kb = new P.Keyboard(P.classify(mock.devices));
+  await assert.rejects(kb.open(), /Cadran 1\.1/);
+});
+
+test('QMK : libellés des codes', () => {
+  const labels = new Map([[0x04, 'Q'], [0x2b, 'Tab']]);
+  const l = (code) => actionLabel({ kind: 'qmk', code }, labels);
+  assert.equal(l(0x04), 'Q');
+  assert.equal(l(0x00a9), 'Volume +');
+  assert.equal(l(0x082b), 'Win+Tab');
+  assert.equal(l(0x5221), 'Fn');
+  assert.equal(l(0x5222), 'Couche 2 (maintenue)');
+  assert.equal(l(0x7e00), 'Écran marche / arrêt');
+  assert.equal(l(0x00af), 'Code 0x00af');
 });
