@@ -38,6 +38,10 @@ Les AK820 Pro n'ont pas tous le même protocole. L'application le détecte d'apr
 
 Sur la famille B, la correspondance des LED par touche n'est connue que pour la disposition ANSI.
 
+## Micrologiciel QMK « Cadran »
+
+Pour remplacer le micrologiciel Ajazz par QMK avec une nouvelle interface d'écran (heure, menu à la molette pour l'éclairage) : [firmware/README.md](firmware/README.md). AK820 Studio ne fonctionne plus une fois QMK installé.
+
 ## Développement
 
 ```
