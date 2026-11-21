@@ -17,6 +17,7 @@ trap 'docker run --rm -v "$WORK:/w" alpine:latest rm -rf /w/src /w/out; rm -rf "
 FONTS=https://raw.githubusercontent.com/google/fonts/main/ofl
 QMK_IMAGE=ghcr.io/qmk/qmk_cli:latest
 
+# VT323 (Terminal) n'est nette qu'à partir de 16 px : en dessous, M/N et m/n se confondent.
 # Glyphes en plus de l'ASCII (accents français, degré).
 ACCENTS='éèêëàâçùûôîïÉÈÊÀÇÛÔÎ°'
 # Les grandes polices ne contiennent que ce qu'affichent l'heure et les réglages.
@@ -54,10 +55,9 @@ docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$WORK:/w" -v "$QMK_D
   font res_cadran cadran_small spacegrotesk_regular.ttf  11 '$ACCENTS' ascii
 
   font res_terminal term_huge  VT323.ttf 42 '$TIME_GLYPHS' noascii
-  font res_terminal term_big   VT323.ttf 30 '$VALUE_GLYPHS' noascii
+  font res_terminal term_big   VT323.ttf 32 '$VALUE_GLYPHS' noascii
   font res_terminal term_mid   VT323.ttf 22 '$ACCENTS' ascii
-  font res_terminal term_text  VT323.ttf 13 '$ACCENTS' ascii
-  font res_terminal term_small VT323.ttf 11 '$ACCENTS' ascii
+  font res_terminal term_text  VT323.ttf 16 '$ACCENTS' ascii
 
   font res_tuiles tui_time  inter_800_32.ttf 30 '$TIME_GLYPHS' noascii
   font res_tuiles tui_value inter_800_32.ttf 26 '$VALUE_GLYPHS' noascii

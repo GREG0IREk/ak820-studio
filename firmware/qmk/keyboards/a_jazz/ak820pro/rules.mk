@@ -46,7 +46,6 @@ SRC += graphics/res_cadran/ic_vitesse_26.qgf.c
 SRC += graphics/res_terminal/term_big.qff.c
 SRC += graphics/res_terminal/term_huge.qff.c
 SRC += graphics/res_terminal/term_mid.qff.c
-SRC += graphics/res_terminal/term_small.qff.c
 SRC += graphics/res_terminal/term_text.qff.c
 SRC += graphics/res_tuiles/ic_couleur_12.qgf.c
 SRC += graphics/res_tuiles/ic_ecran_12.qgf.c

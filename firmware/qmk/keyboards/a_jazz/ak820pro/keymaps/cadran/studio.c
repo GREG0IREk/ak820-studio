@@ -10,7 +10,8 @@
 //                           [6] lignes, [7] colonnes, [8] nb de LED, [9] nb de délais de veille,
 //                           [10] délai actuel, [11] effet « Personnalisé » (0xFF : absent),
 //                           [12] couche de base active, [13] batterie (0xFF : inconnue),
-//                           [14..] délais de veille en minutes (0 = jamais)
+//                           [14..18] délais de veille en minutes (0 = jamais),
+//                           [19] nb d'interfaces d'écran, [20] interface active (protocole 2)
 //   0x02 EFFECT_NAME i   -> nom de l'effet i en UTF-8 à partir de data[4]
 //   0x03 LIGHT_GET       -> [3] effet, [4] teinte, [5] saturation, [6] luminosité, [7] vitesse,
 //                           [8] luminosité maximale
@@ -24,6 +25,8 @@
 //   0x0A PERKEY_GET      première LED, nombre (<= 9) -> r, g, b à partir de data[5]
 //   0x0B PERKEY_SET      première LED, nombre (<= 9), r, g, b… (en mémoire vive)
 //   0x0C PERKEY_SAVE     choisir l'effet (0/1), luminosité (0xFF : inchangée) -> EEPROM
+//   0x0D THEME_NAME i    -> nom de l'interface i en UTF-8 à partir de data[4]
+//   0x0E THEME_SET i     interface de l'écran (appliquée et enregistrée)
 
 #include QMK_KEYBOARD_H
 
@@ -36,7 +39,7 @@ enum {
     ST_SET_VALUE = 0x07,
     ST_UNHANDLED = 0xFF,
     ST_CHANNEL   = 0x14,
-    ST_PROTOCOL  = 1,
+    ST_PROTOCOL  = 2,
 };
 
 enum {
@@ -52,7 +55,13 @@ enum {
     ST_PERKEY_GET     = 0x0A,
     ST_PERKEY_SET     = 0x0B,
     ST_PERKEY_SAVE    = 0x0C,
+    ST_THEME_NAME     = 0x0D,
+    ST_THEME_SET      = 0x0E,
 };
+
+// Position des champs d'interface dans la réponse INFO (après les 5 délais de veille).
+#define INFO_THEMES 16
+_Static_assert(11 + AK820_SLEEP_CHOICES <= INFO_THEMES, "INFO : délais de veille et interfaces se chevauchent");
 
 #define KEYMAP_BYTES ((uint16_t)DYNAMIC_KEYMAP_LAYER_COUNT * MATRIX_ROWS * MATRIX_COLS * 2)
 
@@ -129,6 +138,8 @@ bool ak820_studio_command(uint8_t *data, uint8_t length) {
             a[9]  = get_highest_layer(default_layer_state);
             a[10] = bat > 100 ? 0xFF : bat;
             for (uint8_t i = 0; i < AK820_SLEEP_CHOICES && 11 + i < length - 3; i++) a[11 + i] = ak820_sleep_minutes(i);
+            a[INFO_THEMES]     = display_theme_count();
+            a[INFO_THEMES + 1] = display_theme_current();
             break;
         }
         case ST_EFFECT_NAME: {
@@ -209,6 +220,17 @@ bool ak820_studio_command(uint8_t *data, uint8_t length) {
             display_settings_changed();
             break;
         }
+        case ST_THEME_NAME: {
+            uint8_t i = a[0];
+            if (i >= display_theme_count()) goto refuse;
+            memset(&data[4], 0, length - 4);
+            strncpy((char *)&data[4], display_theme_name(i), length - 5);
+            break;
+        }
+        case ST_THEME_SET:
+            if (a[0] >= display_theme_count()) goto refuse;
+            display_theme_set(a[0]);
+            break;
         default:
             goto refuse;
     }

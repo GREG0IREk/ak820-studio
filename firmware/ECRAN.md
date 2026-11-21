@@ -113,10 +113,11 @@ Icônes `gfx_ic_<nom>_26` et `gfx_ic_<nom>_18`, avec pour noms `effet`, `lumiere
 | Symbole | Taille | Caractères |
 |---|---|---|
 | `font_term_huge` | 42 | `0123456789:-` (heure) |
-| `font_term_big` | 30 | `0123456789:-%/ minJas°` (valeur réglée) |
+| `font_term_big` | 32 | `0123456789:-%/ minJas°` (valeur réglée) |
 | `font_term_mid` | 22 | ASCII + accents (nom d'effet ou d'interface réglé) |
-| `font_term_text` | 13 | ASCII + accents (lignes du menu, barre `[####......]`) |
-| `font_term_small` | 11 | ASCII + accents (en-tête, date, pied de page) |
+| `font_term_text` | 16 | ASCII + accents (tous les petits textes) |
+
+VT323 est une police pixel dessinée sur une grille de 16 px : en dessous de 16 px, « M » et « N », « m » et « n » se confondent. D'où une seule petite taille, 16 px, soit environ 8 px par caractère et 15 caractères par ligne.
 
 **Tuiles** (Inter), `res_tuiles/` :
 
