@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Écran Terminal</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=VT323&amp;family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F55F0}a:hover{color:#1C3BB8}
+</style>
+</helmet>
+<div style="width: 560px; height: 820px; box-sizing: border-box; padding: 36px 40px; background: #ECEDEF; font-family: 'Inter', sans-serif; color: #17181B; display: flex; flex-direction: column; gap: 20px">
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <h1 style="margin: 0; font-size: 26px; font-weight: 700">Terminal</h1>
+    <p style="margin: 0; font-size: 14px; line-height: 20px; color: #4E525A">Police pixel sur fond noir. Menu en liste, la ligne choisie en vidéo inversée, réglages en barre de caractères.</p>
+  </div>
+
+  <div style="align-self: center; padding: 14px; background: #1B1C1F; border-radius: 18px; display: flex; flex-direction: column; gap: 14px">
+    <div style="width: 384px; height: 384px; overflow: hidden; position: relative; border-radius: 4px">
+      <div style="position: absolute; left: 0; top: 0; width: 128px; height: 128px; transform: scale(3); transform-origin: 0 0; background: #0A0F0B; overflow: hidden; font-family: 'VT323', monospace; color: {{g}}">
+
+        <sc-if value="{{isHome}}" hint-placeholder-val="{{true}}">
+          <div style="position: absolute; left: 0; top: 0; width: 128px; height: 128px; box-sizing: border-box; padding: 6px 7px; display: flex; flex-direction: column">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; line-height: 11px">
+              <span>{{conn}}</span>
+              <span>BAT 87%</span>
+            </div>
+            <div style="height: 1px; margin-top: 3px; background: {{dimLine}}"></div>
+            <div style="font-size: 42px; line-height: 38px; text-align: center; margin-top: 14px; letter-spacing: 1px">{{hhmm}}</div>
+            <div style="height: 3px; margin: 6px 10px 0; background: {{dimLine}}">
+              <div style="height: 3px; width: {{secPct}}%; background: {{g}}"></div>
+            </div>
+            <div style="font-size: 12px; line-height: 12px; text-align: center; margin-top: 7px">{{dateUp}}</div>
+            <div style="flex-grow: 1"></div>
+            <div style="display: flex; gap: 4px; font-size: 10px; line-height: 11px">
+              <span style="padding: 0 2px; background: {{capsBg}}; color: {{capsFg}}">MAJ</span>
+              <span style="padding: 0 2px; color: {{dimText}}">FN0</span>
+              <span style="margin-left: auto">{{effectUp}}</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isMenu}}" hint-placeholder-val="{{false}}">
+          <div style="position: absolute; left: 0; top: 0; width: 128px; height: 128px; box-sizing: border-box; padding: 6px 7px; display: flex; flex-direction: column">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; line-height: 11px">
+              <span>&gt; MENU</span>
+              <span style="color: {{dimText}}">{{pos}}</span>
+            </div>
+            <div style="height: 1px; margin: 3px 0 4px; background: {{dimLine}}"></div>
+            <sc-for list="{{menu}}" as="it" hint-placeholder-count="6">
+              <div style="display: flex; justify-content: space-between; font-size: 13px; line-height: 15px; padding: 0 3px; background: {{it.bg}}; color: {{it.fg}}">
+                <span style="white-space: pre">{{it.mark}}{{it.label}}</span>
+                <span style="color: {{it.vfg}}">{{it.short}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isEdit}}" hint-placeholder-val="{{false}}">
+          <div style="position: absolute; left: 0; top: 0; width: 128px; height: 128px; box-sizing: border-box; padding: 6px 7px; display: flex; flex-direction: column">
+            <div style="font-size: 11px; line-height: 11px">&gt; {{curLabelUp}}</div>
+            <div style="height: 1px; margin-top: 3px; background: {{dimLine}}"></div>
+            <div style="font-size: {{valSize}}px; line-height: 30px; text-align: center; margin-top: 16px">{{valText}}</div>
+            <sc-if value="{{isHue}}" hint-placeholder-val="{{false}}">
+              <div style="align-self: center; width: 40px; height: 6px; margin-top: 2px; background: {{hueColor}}"></div>
+            </sc-if>
+            <div style="font-size: 14px; line-height: 14px; text-align: center; margin-top: 8px; white-space: pre">{{bar}}</div>
+            <div style="flex-grow: 1"></div>
+            <div style="font-size: 10px; line-height: 11px; white-space: pre; color: {{dimText}}">MOLETTE  RÉGLER</div>
+            <div style="font-size: 10px; line-height: 11px; white-space: pre; color: {{dimText}}">APPUI    VALIDER</div>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+    <div style="display: flex; gap: 4px; justify-content: center">
+      <sc-for list="{{keys}}" as="k" hint-placeholder-count="14">
+        <div style="width: 22px; height: 22px; border-radius: 4px; background: {{k.c}}"></div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; align-items: center">
+    <div style="display: flex; gap: 10px">
+      <button onClick="{{rotL}}" aria-label="Tourner la molette vers la gauche" style="height: 44px; width: 56px; border-radius: 22px; border: 1px solid #C4C7CD; background: #FFFFFF; color: #17181B; display: grid; place-items: center; cursor: pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>
+      </button>
+      <button onClick="{{press}}" style="height: 44px; padding: 0 22px; border-radius: 22px; border: 1px solid #17181B; background: #17181B; color: #FFFFFF; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer">Appuyer</button>
+      <button onClick="{{rotR}}" aria-label="Tourner la molette vers la droite" style="height: 44px; width: 56px; border-radius: 22px; border: 1px solid #C4C7CD; background: #FFFFFF; color: #17181B; display: grid; place-items: center; cursor: pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"></path></svg>
+      </button>
+    </div>
+    <div style="display: flex; gap: 8px">
+      <button onClick="{{toggleCaps}}" style="height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #C4C7CD; background: #FFFFFF; color: #17181B; font-family: 'Inter', sans-serif; font-size: 13px; cursor: pointer">Verr. Maj : {{capsTxt}}</button>
+      <button onClick="{{nextConn}}" style="height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #C4C7CD; background: #FFFFFF; color: #17181B; font-family: 'Inter', sans-serif; font-size: 13px; cursor: pointer">Connexion : {{conn}}</button>
+    </div>
+  </div>
+
+  <p style="margin: 0; font-size: 13px; line-height: 19px; color: #4E525A; text-align: center">Sur le clavier : molette = volume sur l'accueil, appui long = menu, appui court = sourdine. Les carrés montrent l'effet sur les touches.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"phosphor":{"editor":"color","default":"#5BF08A","options":["#5BF08A","#FFB347","#5CE1FF"]},"$preview":{"width":560,"height":820}}'>
+var EFFECTS = ['Fixe', 'Respiration', 'Vague', 'Arc-en-ciel', 'Réactif', 'Éteint'];
+var EFFECTS_COURT = ['Fixe', 'Respir.', 'Vague', 'Arc-ciel', 'Réactif', 'Éteint'];
+var VEILLES = [1, 3, 5, 10, 0];
+var CONNEXIONS = ['USB', 'BT 1', 'BT 2', 'BT 3', '2,4 GHz'];
+var JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+var MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+var ITEMS = [
+  { id: 'effect', label: 'Effet', tile: 'Effet', d: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18' },
+  { id: 'bright', label: 'Luminosité', tile: 'Lumière', d: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4' },
+  { id: 'speed', label: 'Vitesse', tile: 'Vitesse', d: 'M4 16a8 8 0 1 1 16 0M12 16l4-5' },
+  { id: 'hue', label: 'Couleur', tile: 'Couleur', d: 'M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z' },
+  { id: 'sleep', label: 'Veille', tile: 'Veille', d: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z' },
+  { id: 'back', label: 'Retour', tile: 'Retour', d: 'M10 6l-6 6l6 6M4 12h16' }
+];
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+class Component extends DCLogic {
+  componentDidMount() {
+    var self = this;
+    this.timer = setInterval(function () {
+      self.setState({ tick: ((self.state && self.state.tick) || 0) + 1 });
+    }, 250);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  cur() {
+    var s = this.state || {};
+    return {
+      screen: s.screen || 'home', idx: s.idx || 0,
+      effect: s.effect == null ? 2 : s.effect,
+      bright: s.bright == null ? 80 : s.bright,
+      speed: s.speed == null ? 3 : s.speed,
+      hue: s.hue == null ? 200 : s.hue,
+      sleep: s.sleep == null ? 1 : s.sleep,
+      caps: !!s.caps, conn: s.conn || 0, tick: s.tick || 0
+    };
+  }
+  rotate(d) {
+    var s = this.cur();
+    if (s.screen === 'menu') {
+      this.setState({ idx: (s.idx + d + ITEMS.length) % ITEMS.length });
+    } else if (s.screen === 'edit') {
+      var id = ITEMS[s.idx].id, p = {};
+      if (id === 'effect') p.effect = (s.effect + d + EFFECTS.length) % EFFECTS.length;
+      if (id === 'bright') p.bright = Math.max(0, Math.min(100, s.bright + d * 10));
+      if (id === 'speed') p.speed = Math.max(1, Math.min(5, s.speed + d));
+      if (id === 'hue') p.hue = (s.hue + d * 20 + 360) % 360;
+      if (id === 'sleep') p.sleep = (s.sleep + d + VEILLES.length) % VEILLES.length;
+      this.setState(p);
+    }
+  }
+  appui() {
+    var s = this.cur();
+    if (s.screen === 'home') this.setState({ screen: 'menu', idx: 0 });
+    else if (s.screen === 'menu') this.setState({ screen: ITEMS[s.idx].id === 'back' ? 'home' : 'edit' });
+    else this.setState({ screen: 'menu' });
+  }
+  valeur(id, s, court) {
+    if (id === 'effect') return court ? EFFECTS_COURT[s.effect] : EFFECTS[s.effect];
+    if (id === 'bright') return s.bright + '%';
+    if (id === 'speed') return s.speed + '/5';
+    if (id === 'hue') return s.hue + '°';
+    if (id === 'sleep') return VEILLES[s.sleep] === 0 ? 'Jamais' : VEILLES[s.sleep] + ' min';
+    return '';
+  }
+  part(id, s) {
+    if (id === 'effect') return s.effect / (EFFECTS.length - 1);
+    if (id === 'bright') return s.bright / 100;
+    if (id === 'speed') return (s.speed - 1) / 4;
+    if (id === 'hue') return s.hue / 340;
+    if (id === 'sleep') return s.sleep / (VEILLES.length - 1);
+    return 0;
+  }
+  touches(s) {
+    var out = [], L = Math.round(12 + s.bright * 0.45), t = s.tick * s.speed;
+    for (var i = 0; i < 14; i++) {
+      var c, k;
+      if (s.bright === 0 || s.effect === 5) c = '#26272B';
+      else if (s.effect === 0) c = 'hsl(' + s.hue + ', 85%, ' + L + '%)';
+      else if (s.effect === 1) { k = (Math.sin(t * 0.25) + 1) / 2; c = 'hsl(' + s.hue + ', 85%, ' + Math.round(8 + (L - 8) * k) + '%)'; }
+      else if (s.effect === 2) { k = (Math.sin(t * 0.4 - i * 0.6) + 1) / 2; c = 'hsl(' + s.hue + ', 85%, ' + Math.round(8 + (L - 8) * k) + '%)'; }
+      else if (s.effect === 3) c = 'hsl(' + ((i * 26 + t * 12) % 360) + ', 85%, ' + L + '%)';
+      else c = i === Math.floor(t / 2) % 14 ? 'hsl(' + s.hue + ', 85%, ' + L + '%)' : 'hsl(' + s.hue + ', 30%, 12%)';
+      out.push({ c: c });
+    }
+    return out;
+  }
+  base() {
+    var s = this.cur(), self = this, now = new Date(), item = ITEMS[s.idx];
+    return {
+      s: s, item: item,
+      isHome: s.screen === 'home', isMenu: s.screen === 'menu', isEdit: s.screen === 'edit',
+      hhmm: pad2(now.getHours()) + ':' + pad2(now.getMinutes()),
+      sec: now.getSeconds(),
+      date: JOURS[now.getDay()] + ' ' + now.getDate() + ' ' + MOIS[now.getMonth()],
+      conn: CONNEXIONS[s.conn],
+      capsTxt: s.caps ? 'oui' : 'non',
+      effectName: EFFECTS[s.effect],
+      curLabel: item.label, curIcon: item.d,
+      valText: this.valeur(item.id, s, false),
+      frac: this.part(item.id, s),
+      isHue: item.id === 'hue',
+      hueColor: 'hsl(' + s.hue + ', 85%, 55%)',
+      pos: (s.idx + 1) + '/' + ITEMS.length,
+      keys: this.touches(s),
+      rotL: function () { self.rotate(-1); },
+      rotR: function () { self.rotate(1); },
+      press: function () { self.appui(); },
+      toggleCaps: function () { self.setState({ caps: !self.cur().caps }); },
+      nextConn: function () { self.setState({ conn: (self.cur().conn + 1) % CONNEXIONS.length }); }
+    };
+  }
+  renderVals() {
+    var b = this.base(), self = this, s = b.s;
+    var G = this.props.phosphor ?? '#5BF08A', BG = '#0A0F0B';
+    var n = Math.round(b.frac * 10);
+    b.g = G;
+    b.dimLine = 'color-mix(in srgb, ' + G + ' 28%, ' + BG + ')';
+    b.dimText = 'color-mix(in srgb, ' + G + ' 55%, ' + BG + ')';
+    b.secPct = Math.round(b.sec / 59 * 100);
+    b.dateUp = b.date.toUpperCase();
+    b.effectUp = EFFECTS_COURT[s.effect].toUpperCase();
+    b.capsBg = s.caps ? G : 'transparent';
+    b.capsFg = s.caps ? BG : b.dimText;
+    b.curLabelUp = b.curLabel.toUpperCase();
+    b.valSize = b.item.id === 'effect' ? 22 : 30;
+    b.bar = '[' + '#'.repeat(n) + '.'.repeat(10 - n) + ']';
+    b.menu = ITEMS.map(function (it, i) {
+      var sel = i === s.idx;
+      return {
+        label: it.label, mark: sel ? '>' : ' ',
+        short: self.valeur(it.id, s, true),
+        bg: sel ? G : 'transparent', fg: sel ? BG : G, vfg: sel ? BG : b.dimText
+      };
+    });
+    return b;
+  }
+}
+</script>
+</body>
+</html>

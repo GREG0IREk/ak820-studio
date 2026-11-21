@@ -7,10 +7,12 @@
 #define ENABLE_RGB_MATRIX_SOLID_REACTIVE_SIMPLE
 
 // Version renvoyée par la commande système 0x13/0x02 (outil de mise à jour).
-#define AK820_FW_VERSION "cadran-1.1"
+#define AK820_FW_VERSION "cadran-1.2"
 
-// 12 icônes chargées (6 entrées du menu x 2 tailles) : QMK en prévoit 8 par défaut.
+// Ressources chargées par l'interface active (une seule à la fois) : 12 icônes
+// au plus (6 entrées du menu x 2 tailles) et 5 polices. QMK prévoit 8 et 4 par défaut.
 #define QUANTUM_PAINTER_NUM_IMAGES 12
+#define QUANTUM_PAINTER_NUM_FONTS  5
 
 // AK820 Studio (studio.c) : effet « Personnalisé » dans le menu et couleurs par touche
 // dans le bloc utilisateur de l'EEPROM (81 LED x 3 octets + 1). La version du bloc sert

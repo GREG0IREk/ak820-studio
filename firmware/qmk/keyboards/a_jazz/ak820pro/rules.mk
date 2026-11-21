@@ -26,25 +26,44 @@ USE_HAL_I2C_FALLBACK = yes
 
 SRC += bluetooth/ch582f_ajazz.c
 
-# Interface « Cadran » (graphics/display.c) : polices Space Grotesk et icônes du
-# menu, générées par firmware/assets/generate.sh du dépôt ak820-studio.
+# Interfaces de l'écran (graphics/theme_*.c) : polices et icônes générées par
+# firmware/assets/generate.sh du dépôt ak820-studio (voir firmware/ECRAN.md).
 SRC += graphics/res_cadran/cadran_big.qff.c
 SRC += graphics/res_cadran/cadran_mid.qff.c
 SRC += graphics/res_cadran/cadran_small.qff.c
-SRC += graphics/res_cadran/ic_effet_26.qgf.c
-SRC += graphics/res_cadran/ic_effet_18.qgf.c
-SRC += graphics/res_cadran/ic_lumiere_26.qgf.c
-SRC += graphics/res_cadran/ic_lumiere_18.qgf.c
-SRC += graphics/res_cadran/ic_vitesse_26.qgf.c
-SRC += graphics/res_cadran/ic_vitesse_18.qgf.c
-SRC += graphics/res_cadran/ic_couleur_26.qgf.c
 SRC += graphics/res_cadran/ic_couleur_18.qgf.c
-SRC += graphics/res_cadran/ic_veille_26.qgf.c
+SRC += graphics/res_cadran/ic_couleur_26.qgf.c
+SRC += graphics/res_cadran/ic_ecran_18.qgf.c
+SRC += graphics/res_cadran/ic_ecran_26.qgf.c
+SRC += graphics/res_cadran/ic_effet_18.qgf.c
+SRC += graphics/res_cadran/ic_effet_26.qgf.c
+SRC += graphics/res_cadran/ic_lumiere_18.qgf.c
+SRC += graphics/res_cadran/ic_lumiere_26.qgf.c
 SRC += graphics/res_cadran/ic_veille_18.qgf.c
-SRC += graphics/res_cadran/ic_retour_26.qgf.c
-SRC += graphics/res_cadran/ic_retour_18.qgf.c
+SRC += graphics/res_cadran/ic_veille_26.qgf.c
+SRC += graphics/res_cadran/ic_vitesse_18.qgf.c
+SRC += graphics/res_cadran/ic_vitesse_26.qgf.c
+SRC += graphics/res_terminal/term_big.qff.c
+SRC += graphics/res_terminal/term_huge.qff.c
+SRC += graphics/res_terminal/term_mid.qff.c
+SRC += graphics/res_terminal/term_small.qff.c
+SRC += graphics/res_terminal/term_text.qff.c
+SRC += graphics/res_tuiles/ic_couleur_12.qgf.c
+SRC += graphics/res_tuiles/ic_ecran_12.qgf.c
+SRC += graphics/res_tuiles/ic_effet_12.qgf.c
+SRC += graphics/res_tuiles/ic_lumiere_12.qgf.c
+SRC += graphics/res_tuiles/ic_veille_12.qgf.c
+SRC += graphics/res_tuiles/ic_vitesse_12.qgf.c
+SRC += graphics/res_tuiles/tui_bold.qff.c
+SRC += graphics/res_tuiles/tui_mid.qff.c
+SRC += graphics/res_tuiles/tui_small.qff.c
+SRC += graphics/res_tuiles/tui_time.qff.c
+SRC += graphics/res_tuiles/tui_value.qff.c
 
 SRC += graphics/display.c
+SRC += graphics/theme_cadran.c
+SRC += graphics/theme_terminal.c
+SRC += graphics/theme_tuiles.c
 SRC += rtc/rtc.c
 SRC += media/media.c
 VPATH += bluetooth

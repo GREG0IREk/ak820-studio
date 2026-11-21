@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Écran Cadran</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&amp;family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F55F0}a:hover{color:#1C3BB8}
+</style>
+</helmet>
+<div style="width: 560px; height: 820px; box-sizing: border-box; padding: 36px 40px; background: #ECEDEF; font-family: 'Inter', sans-serif; color: #17181B; display: flex; flex-direction: column; gap: 20px">
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <h1 style="margin: 0; font-size: 26px; font-weight: 700">Cadran</h1>
+    <p style="margin: 0; font-size: 14px; line-height: 20px; color: #4E525A">Anneau des secondes autour de l'heure. Menu en carrousel d'icônes que la molette fait défiler, réglage affiché sur l'anneau.</p>
+  </div>
+
+  <div style="align-self: center; padding: 14px; background: #1B1C1F; border-radius: 18px; display: flex; flex-direction: column; gap: 14px">
+    <div style="width: 384px; height: 384px; overflow: hidden; position: relative; border-radius: 4px">
+      <div style="position: absolute; left: 0; top: 0; width: 128px; height: 128px; transform: scale(3); transform-origin: 0 0; background: #0E1114; overflow: hidden; font-family: 'Space Grotesk', sans-serif; color: #F2F2F0">
+
+        <sc-if value="{{isHome}}" hint-placeholder-val="{{true}}">
+          <svg width="128" height="128" viewBox="0 0 128 128" style="position: absolute; left: 0; top: 0" aria-hidden="true">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#1E242B" stroke-width="4"></circle>
+            <circle cx="64" cy="64" r="56" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 64 64)" style="stroke: {{accent}}; stroke-dasharray: {{secDash}} 400"></circle>
+          </svg>
+          <div style="position: absolute; left: 0; top: 0; width: 128px; height: 128px; display: flex; flex-direction: column; align-items: center; justify-content: center">
+            <div style="font-size: 8px; line-height: 9px; letter-spacing: 1px; color: #8A929E">{{connUp}}</div>
+            <div style="font-size: 30px; line-height: 32px; font-weight: 600; margin-top: 3px">{{hhmm}}</div>
+            <div style="font-size: 9px; line-height: 10px; color: #8A929E; margin-top: 2px">{{date}}</div>
+            <div style="display: flex; gap: 5px; align-items: center; margin-top: 11px; font-size: 8px; line-height: 9px">
+              <span>87 %</span>
+              <span style="width: 3px; height: 3px; border-radius: 2px; background: #3A424C"></span>
+              <span style="color: {{capsCol}}">MAJ</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isMenu}}" hint-placeholder-val="{{false}}">
+          <svg width="128" height="128" viewBox="0 0 128 128" style="position: absolute; left: 0; top: 0" aria-hidden="true">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#1E242B" stroke-width="4"></circle>
+          </svg>
+          <div style="position: absolute; left: 0; top: 30px; width: 128px; height: 44px; overflow: hidden">
+            <div style="display: flex; transform: translateX({{stripX}}px); transition: transform 0.2s ease-out">
+              <sc-for list="{{carousel}}" as="it" hint-placeholder-count="6">
+                <div style="flex: none; width: 40px; height: 44px; display: grid; place-items: center">
+                  <div style="display: grid; place-items: center; transition: transform 0.2s, opacity 0.2s; transform: scale({{it.sc}}); opacity: {{it.op}}; color: {{it.col}}">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{it.d}}"></path></svg>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="position: absolute; left: 0; top: 77px; width: 128px; text-align: center; font-size: 12px; line-height: 14px; font-weight: 600">{{curLabel}}</div>
+          <div style="position: absolute; left: 0; top: 92px; width: 128px; text-align: center; font-size: 9px; line-height: 10px; color: #8A929E">{{menuValue}}</div>
+          <div style="position: absolute; left: 0; top: 107px; width: 128px; display: flex; justify-content: center; gap: 3px">
+            <sc-for list="{{dots}}" as="dt" hint-placeholder-count="6">
+              <div style="width: 4px; height: 4px; border-radius: 2px; background: {{dt.bg}}"></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isEdit}}" hint-placeholder-val="{{false}}">
+          <svg width="128" height="128" viewBox="0 0 128 128" style="position: absolute; left: 0; top: 0" aria-hidden="true">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#1E242B" stroke-width="4"></circle>
+            <circle cx="64" cy="64" r="56" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 64 64)" style="transition: stroke-dasharray 0.2s; stroke: {{arcColor}}; stroke-dasharray: {{arcDash}} 400"></circle>
+          </svg>
+          <div style="position: absolute; left: 0; top: 0; width: 128px; height: 128px; display: flex; flex-direction: column; align-items: center; justify-content: center">
+            <div style="color: {{arcColor}}; display: grid; place-items: center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{curIcon}}"></path></svg>
+            </div>
+            <div style="font-size: 8px; line-height: 9px; letter-spacing: 1px; color: #8A929E; margin-top: 4px">{{curLabelUp}}</div>
+            <div style="font-size: {{valSize}}px; line-height: 28px; font-weight: 600; margin-top: 2px">{{valText}}</div>
+            <div style="font-size: 8px; line-height: 9px; color: #8A929E; margin-top: 6px">appui : valider</div>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+    <div style="display: flex; gap: 4px; justify-content: center">
+      <sc-for list="{{keys}}" as="k" hint-placeholder-count="14">
+        <div style="width: 22px; height: 22px; border-radius: 4px; background: {{k.c}}"></div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; align-items: center">
+    <div style="display: flex; gap: 10px">
+      <button onClick="{{rotL}}" aria-label="Tourner la molette vers la gauche" style="height: 44px; width: 56px; border-radius: 22px; border: 1px solid #C4C7CD; background: #FFFFFF; color: #17181B; display: grid; place-items: center; cursor: pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>
+      </button>
+      <button onClick="{{press}}" style="height: 44px; padding: 0 22px; border-radius: 22px; border: 1px solid #17181B; background: #17181B; color: #FFFFFF; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer">Appuyer</button>
+      <button onClick="{{rotR}}" aria-label="Tourner la molette vers la droite" style="height: 44px; width: 56px; border-radius: 22px; border: 1px solid #C4C7CD; background: #FFFFFF; color: #17181B; display: grid; place-items: center; cursor: pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"></path></svg>
+      </button>
+    </div>
+    <div style="display: flex; gap: 8px">
+      <button onClick="{{toggleCaps}}" style="height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #C4C7CD; background: #FFFFFF; color: #17181B; font-family: 'Inter', sans-serif; font-size: 13px; cursor: pointer">Verr. Maj : {{capsTxt}}</button>
+      <button onClick="{{nextConn}}" style="height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #C4C7CD; background: #FFFFFF; color: #17181B; font-family: 'Inter', sans-serif; font-size: 13px; cursor: pointer">Connexion : {{conn}}</button>
+    </div>
+  </div>
+
+  <p style="margin: 0; font-size: 13px; line-height: 19px; color: #4E525A; text-align: center">Sur le clavier : molette = volume sur l'accueil, appui long = menu, appui court = sourdine. Les carrés montrent l'effet sur les touches.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#FF8A3D","options":["#FF8A3D","#7C9CFF","#3DDC97"]},"$preview":{"width":560,"height":820}}'>
+var EFFECTS = ['Fixe', 'Respiration', 'Vague', 'Arc-en-ciel', 'Réactif', 'Éteint'];
+var EFFECTS_COURT = ['Fixe', 'Respir.', 'Vague', 'Arc-ciel', 'Réactif', 'Éteint'];
+var VEILLES = [1, 3, 5, 10, 0];
+var CONNEXIONS = ['USB', 'BT 1', 'BT 2', 'BT 3', '2,4 GHz'];
+var JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+var MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+var ITEMS = [
+  { id: 'effect', label: 'Effet', tile: 'Effet', d: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18' },
+  { id: 'bright', label: 'Luminosité', tile: 'Lumière', d: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4' },
+  { id: 'speed', label: 'Vitesse', tile: 'Vitesse', d: 'M4 16a8 8 0 1 1 16 0M12 16l4-5' },
+  { id: 'hue', label: 'Couleur', tile: 'Couleur', d: 'M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z' },
+  { id: 'sleep', label: 'Veille', tile: 'Veille', d: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z' },
+  { id: 'back', label: 'Retour', tile: 'Retour', d: 'M10 6l-6 6l6 6M4 12h16' }
+];
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+class Component extends DCLogic {
+  componentDidMount() {
+    var self = this;
+    this.timer = setInterval(function () {
+      self.setState({ tick: ((self.state && self.state.tick) || 0) + 1 });
+    }, 250);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  cur() {
+    var s = this.state || {};
+    return {
+      screen: s.screen || 'home', idx: s.idx || 0,
+      effect: s.effect == null ? 2 : s.effect,
+      bright: s.bright == null ? 80 : s.bright,
+      speed: s.speed == null ? 3 : s.speed,
+      hue: s.hue == null ? 200 : s.hue,
+      sleep: s.sleep == null ? 1 : s.sleep,
+      caps: !!s.caps, conn: s.conn || 0, tick: s.tick || 0
+    };
+  }
+  rotate(d) {
+    var s = this.cur();
+    if (s.screen === 'menu') {
+      this.setState({ idx: (s.idx + d + ITEMS.length) % ITEMS.length });
+    } else if (s.screen === 'edit') {
+      var id = ITEMS[s.idx].id, p = {};
+      if (id === 'effect') p.effect = (s.effect + d + EFFECTS.length) % EFFECTS.length;
+      if (id === 'bright') p.bright = Math.max(0, Math.min(100, s.bright + d * 10));
+      if (id === 'speed') p.speed = Math.max(1, Math.min(5, s.speed + d));
+      if (id === 'hue') p.hue = (s.hue + d * 20 + 360) % 360;
+      if (id === 'sleep') p.sleep = (s.sleep + d + VEILLES.length) % VEILLES.length;
+      this.setState(p);
+    }
+  }
+  appui() {
+    var s = this.cur();
+    if (s.screen === 'home') this.setState({ screen: 'menu', idx: 0 });
+    else if (s.screen === 'menu') this.setState({ screen: ITEMS[s.idx].id === 'back' ? 'home' : 'edit' });
+    else this.setState({ screen: 'menu' });
+  }
+  valeur(id, s, court) {
+    if (id === 'effect') return court ? EFFECTS_COURT[s.effect] : EFFECTS[s.effect];
+    if (id === 'bright') return s.bright + ' %';
+    if (id === 'speed') return s.speed + ' / 5';
+    if (id === 'hue') return s.hue + '°';
+    if (id === 'sleep') return VEILLES[s.sleep] === 0 ? 'Jamais' : VEILLES[s.sleep] + ' min';
+    return 'Accueil';
+  }
+  part(id, s) {
+    if (id === 'effect') return s.effect / (EFFECTS.length - 1);
+    if (id === 'bright') return s.bright / 100;
+    if (id === 'speed') return (s.speed - 1) / 4;
+    if (id === 'hue') return s.hue / 340;
+    if (id === 'sleep') return s.sleep / (VEILLES.length - 1);
+    return 0;
+  }
+  touches(s) {
+    var out = [], L = Math.round(12 + s.bright * 0.45), t = s.tick * s.speed;
+    for (var i = 0; i < 14; i++) {
+      var c, k;
+      if (s.bright === 0 || s.effect === 5) c = '#26272B';
+      else if (s.effect === 0) c = 'hsl(' + s.hue + ', 85%, ' + L + '%)';
+      else if (s.effect === 1) { k = (Math.sin(t * 0.25) + 1) / 2; c = 'hsl(' + s.hue + ', 85%, ' + Math.round(8 + (L - 8) * k) + '%)'; }
+      else if (s.effect === 2) { k = (Math.sin(t * 0.4 - i * 0.6) + 1) / 2; c = 'hsl(' + s.hue + ', 85%, ' + Math.round(8 + (L - 8) * k) + '%)'; }
+      else if (s.effect === 3) c = 'hsl(' + ((i * 26 + t * 12) % 360) + ', 85%, ' + L + '%)';
+      else c = i === Math.floor(t / 2) % 14 ? 'hsl(' + s.hue + ', 85%, ' + L + '%)' : 'hsl(' + s.hue + ', 30%, 12%)';
+      out.push({ c: c });
+    }
+    return out;
+  }
+  base() {
+    var s = this.cur(), self = this, now = new Date(), item = ITEMS[s.idx];
+    return {
+      s: s, item: item,
+      isHome: s.screen === 'home', isMenu: s.screen === 'menu', isEdit: s.screen === 'edit',
+      hhmm: pad2(now.getHours()) + ':' + pad2(now.getMinutes()),
+      sec: now.getSeconds(),
+      date: JOURS[now.getDay()] + ' ' + now.getDate() + ' ' + MOIS[now.getMonth()],
+      conn: CONNEXIONS[s.conn],
+      capsTxt: s.caps ? 'oui' : 'non',
+      effectName: EFFECTS[s.effect],
+      curLabel: item.label, curIcon: item.d,
+      valText: this.valeur(item.id, s, false),
+      frac: this.part(item.id, s),
+      isHue: item.id === 'hue',
+      hueColor: 'hsl(' + s.hue + ', 85%, 55%)',
+      pos: (s.idx + 1) + '/' + ITEMS.length,
+      keys: this.touches(s),
+      rotL: function () { self.rotate(-1); },
+      rotR: function () { self.rotate(1); },
+      press: function () { self.appui(); },
+      toggleCaps: function () { self.setState({ caps: !self.cur().caps }); },
+      nextConn: function () { self.setState({ conn: (self.cur().conn + 1) % CONNEXIONS.length }); }
+    };
+  }
+  renderVals() {
+    var b = this.base(), s = b.s;
+    var A = this.props.accent ?? '#FF8A3D';
+    var C = 2 * Math.PI * 56;
+    b.accent = A;
+    b.connUp = b.conn.toUpperCase();
+    b.secDash = (b.sec / 59 * C).toFixed(1);
+    b.arcDash = (Math.max(0.02, b.frac) * C).toFixed(1);
+    b.arcColor = b.isHue ? b.hueColor : A;
+    b.capsCol = s.caps ? A : '#3A424C';
+    b.curLabelUp = b.curLabel.toUpperCase();
+    b.valSize = b.item.id === 'effect' ? 16 : 26;
+    b.menuValue = this.valeur(b.item.id, s, false);
+    b.stripX = 44 - s.idx * 40;
+    b.carousel = ITEMS.map(function (it, i) {
+      var dist = Math.abs(i - s.idx);
+      return { d: it.d, col: dist === 0 ? A : '#8A929E', op: dist > 1 ? 0 : (dist === 0 ? 1 : 0.55), sc: dist === 0 ? 1 : 0.7 };
+    });
+    b.dots = ITEMS.map(function (it, i) { return { bg: i === s.idx ? A : '#3A424C' }; });
+    return b;
+  }
+}
+</script>
+</body>
+</html>

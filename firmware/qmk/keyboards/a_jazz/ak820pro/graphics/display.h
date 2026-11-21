@@ -1,5 +1,5 @@
 // Copyright 2026 Fernando Birra
-// Copyright 2026 Grégoire Kuhn (interface « Cadran »)
+// Copyright 2026 Grégoire Kuhn (menu de la molette, interfaces)
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -15,8 +15,8 @@ void display_set_power(bool on);
 bool display_get_power(void);
 void display_toggle_power(void);
 
-// Gardé pour la compatibilité avec ak820pro.c (touche SCR_MEDIA) : sans effet
-// dans l'interface Cadran, qui n'affiche pas le morceau en cours.
+// Gardé pour la compatibilité avec ak820pro.c (touche SCR_MEDIA) : sans effet,
+// aucune interface n'affiche le morceau en cours.
 void display_toggle_media(void);
 
 // Veille de l'écran (minuterie d'inactivité ou mise en veille USB).
@@ -45,8 +45,18 @@ void        display_effect_apply(uint8_t index, bool save);
 int8_t      display_effect_perkey(void);       // index de « Personnalisé », -1 si absent
 void        display_settings_changed(void);   // réglages changés depuis le PC : menu à jour
 
+// Interfaces de l'écran (Cadran, Terminal, Tuiles), aussi pour le canal HID.
+uint8_t     display_theme_count(void);
+const char *display_theme_name(uint8_t index);
+uint8_t     display_theme_current(void);
+void        display_theme_set(uint8_t index);   // applique, redessine et enregistre
+
 // Délai de veille réglable depuis le menu (défini dans ak820pro.c, mémorisé en EEPROM).
 #define AK820_SLEEP_CHOICES 5
 uint8_t ak820_get_sleep_index(void);
 void    ak820_set_sleep_index(uint8_t index);
 uint8_t ak820_sleep_minutes(uint8_t index);   // 0 = jamais
+
+// Interface choisie (défini dans ak820pro.c, mémorisé en EEPROM ; 0 = Cadran).
+uint8_t ak820_get_theme_index(void);
+void    ak820_set_theme_index(uint8_t index);

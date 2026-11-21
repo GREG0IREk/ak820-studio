@@ -31,7 +31,8 @@ static uint8_t wireless_mode = WL_MODE_USB;
 typedef struct __attribute__((packed)) {
     uint8_t bt_profile;    // last BT slot selected (CH582_PROFILE_BT_1..3)
     uint8_t sleep_choice;  // délai de veille : index + 1 (0 = jamais réglé)
-    uint8_t _pad[2];
+    uint8_t theme;         // interface de l'écran : index (0 = Cadran, aussi pour une EEPROM vierge)
+    uint8_t _pad[1];
 } kb_config_t;
 static kb_config_t kb_config;
 
@@ -67,6 +68,16 @@ void ak820_set_sleep_index(uint8_t index) {
     if (index >= AK820_SLEEP_CHOICES || index == sleep_index) return;
     sleep_index             = index;
     kb_config.sleep_choice = index + 1;
+    eeconfig_update_kb_datablock(&kb_config, 0, sizeof(kb_config));
+}
+
+uint8_t ak820_get_theme_index(void) {
+    return kb_config.theme;
+}
+
+void ak820_set_theme_index(uint8_t index) {
+    if (index == kb_config.theme) return;
+    kb_config.theme = index;
     eeconfig_update_kb_datablock(&kb_config, 0, sizeof(kb_config));
 }
 
