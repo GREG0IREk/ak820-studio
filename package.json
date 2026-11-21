@@ -1,0 +1,6 @@
+{
+  "name": "ak820-studio",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test test/protocol.test.mjs", "build": "node build.mjs" }
+}

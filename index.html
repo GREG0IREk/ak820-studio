@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AK820 Studio</title>
+<meta name="description" content="Réglages de l'Ajazz AK820 Pro dans le navigateur : éclairage, couleurs par touche, écran, réaffectation des touches.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b4cdb' stroke-width='2' stroke-linecap='round'%3E%3Crect x='2' y='6' width='20' height='13' rx='2'/%3E%3Cpath d='M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10"/></svg>
+    AK820 Studio
+  </div>
+  <div class="spacer"></div>
+  <div class="status" id="status"><i class="dot"></i><span>Non connecté</span></div>
+  <button class="btn primary" id="connect">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 7V2M15 7V2M6 7h12v5a6 6 0 0 1-12 0zM12 18v4"/></svg>
+    <span>Connecter</span>
+  </button>
+</header>
+
+<div class="layout">
+  <nav class="side" id="nav" aria-label="Sections">
+    <button data-view="lighting" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>Éclairage</button>
+    <button data-view="perkey"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.6 3.4 6 6L10 20H4v-6z"/><path d="m12.5 5.5 6 6"/></svg>Touche par touche</button>
+    <button data-view="screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m4 16 4-4 4 4 3-3 5 5"/><circle cx="15" cy="9" r="1.5"/></svg>Écran</button>
+    <button data-view="keymap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10l-3-3M17 17H7l3 3"/></svg>Touches</button>
+    <button data-view="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Système</button>
+  </nav>
+
+  <main id="main">
+    <div id="banner"></div>
+
+    <!-- Éclairage -->
+    <section class="view active" id="view-lighting">
+      <h1>Éclairage</h1>
+      <p class="lead" id="lighting-lead">Effet appliqué à tout le clavier.</p>
+      <div class="grid-2">
+        <div class="card"><h2>Effet</h2><div class="effects" id="effects"></div></div>
+        <div class="card">
+          <div class="field">
+            <div class="label">Couleur</div>
+            <div class="colors" id="light-colors"></div>
+          </div>
+          <div class="field">
+            <label class="switch"><input type="checkbox" id="light-rainbow"> Arc-en-ciel à la place de la couleur</label>
+          </div>
+          <div class="field"><div class="label">Luminosité</div><div class="seg" id="light-brightness"></div></div>
+          <div class="field" id="speed-field"><div class="label">Vitesse</div><div class="seg" id="light-speed"></div></div>
+          <div class="reveal" id="dir-reveal"><div><div class="field"><div class="label">Direction</div><div class="seg" id="light-direction"></div></div></div></div>
+          <div class="field row" id="light-apply-row">
+            <button class="btn primary" id="light-apply">Appliquer</button>
+            <span class="note" id="light-note"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Touche par touche -->
+    <section class="view" id="view-perkey">
+      <h1>Touche par touche</h1>
+      <p class="lead">Cliquez ou glissez sur les touches pour les peindre, puis envoyez au clavier.</p>
+      <div class="card">
+        <div class="row" style="justify-content: space-between; margin-bottom: 14px;">
+          <div class="colors" id="pk-colors"></div>
+          <div class="row">
+            <button class="btn" id="pk-fill">Tout remplir</button>
+            <button class="btn" id="pk-clear">Tout éteindre</button>
+          </div>
+        </div>
+        <div class="deck"><div class="kb paint" id="pk-kb"></div></div>
+        <div class="row" style="margin-top: 14px; justify-content: space-between;">
+          <div class="row">
+            <span class="note">Modèles</span>
+            <button class="btn" data-preset="rainbow">Arc-en-ciel</button>
+            <button class="btn" data-preset="gaming">ZQSD</button>
+            <button class="btn" data-preset="rows">Rangées</button>
+          </div>
+          <div class="row">
+            <span class="note">Luminosité</span>
+            <div class="seg" id="pk-brightness"></div>
+          </div>
+        </div>
+        <p class="note warn hidden" id="pk-iso-note">Sur ce firmware, la correspondance des LED n'est connue que pour la disposition ANSI : la touche « &lt; &gt; » n'est pas pilotée.</p>
+        <div class="row end" style="margin-top: 16px;">
+          <button class="btn" id="pk-read">Lire depuis le clavier</button>
+          <button class="btn primary" id="pk-send">Envoyer au clavier</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Écran -->
+    <section class="view" id="view-screen">
+      <h1>Écran</h1>
+      <p class="lead">Image ou GIF animé sur l'écran 128 × 128. Le cadrage et les couleurs de l'aperçu sont ceux de l'écran.</p>
+      <div class="card">
+        <div class="tft-wrap">
+          <div class="stack">
+            <canvas class="tft" id="tft-preview" width="128" height="128"></canvas>
+            <p class="note" id="tft-meta">Aucune image</p>
+          </div>
+          <div>
+            <label class="drop" id="drop">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+              <span><b>Choisir un fichier</b> ou le déposer ici</span>
+              <span class="note">PNG, JPEG, GIF, WebP</span>
+              <input type="file" id="tft-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+            </label>
+            <div id="tft-opts" class="hidden">
+              <div class="field" style="margin-top: 16px;"><div class="label">Cadrage</div>
+                <div class="seg" id="tft-fit"><button data-v="cover">Remplir</button><button data-v="contain">Contenir</button></div></div>
+              <div class="field"><label for="tft-zoom">Zoom</label><input type="range" id="tft-zoom" min="1" max="3" step="0.05" value="1"></div>
+              <div class="field"><label for="tft-x">Position horizontale</label><input type="range" id="tft-x" min="-1" max="1" step="0.02" value="0"></div>
+              <div class="field"><label for="tft-y">Position verticale</label><input type="range" id="tft-y" min="-1" max="1" step="0.02" value="0"></div>
+              <div class="field"><div class="label">Fond</div><div class="colors" id="tft-bg"></div></div>
+              <div class="field"><div class="label">Vitesse de l'animation</div>
+                <div class="seg" id="tft-speed"><button data-v="0.5">× 0,5</button><button data-v="1">× 1</button><button data-v="1.5">× 1,5</button><button data-v="2">× 2</button></div></div>
+            </div>
+            <div class="field">
+              <div class="progress hidden" id="tft-progress"><div></div></div>
+            </div>
+            <div class="row" style="margin-top: 16px;">
+              <button class="btn primary" id="tft-send" disabled>Envoyer à l'écran</button>
+              <button class="btn" id="tft-clock">Mettre l'horloge à l'heure</button>
+              <button class="btn" id="tft-factory">Animation d'origine</button>
+            </div>
+            <p class="note" style="margin-top: 12px;">Fn + Suppr bascule l'écran entre l'horloge et votre image.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Touches -->
+    <section class="view" id="view-keymap">
+      <h1>Touches</h1>
+      <p class="lead">Choisissez une touche, puis l'action qu'elle doit envoyer. Les changements restent sur le clavier, quel que soit l'ordinateur.</p>
+      <div id="keymap-unsupported" class="banner warn hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>La réaffectation n'est pas décodée pour le firmware de ce clavier (interface 0xFF13). Éclairage, couleurs par touche, écran et veille fonctionnent.</span></div>
+      <div class="km-grid" id="keymap-body">
+        <div class="card">
+          <div class="row" style="justify-content: space-between; margin-bottom: 14px;">
+            <div class="seg" id="km-layer"><button data-v="base" aria-pressed="true">Couche normale</button><button data-v="fn">Couche Fn</button></div>
+            <span class="note" id="km-count"></span>
+          </div>
+          <div class="deck"><div class="kb pick" id="km-kb"></div></div>
+          <div class="row end" style="margin-top: 16px;">
+            <button class="btn" id="km-factory">Valeurs d'usine</button>
+            <button class="btn" id="km-revert" disabled>Annuler</button>
+            <button class="btn primary" id="km-write" disabled>Écrire sur le clavier</button>
+          </div>
+        </div>
+        <div class="card picker-panel">
+          <h2 id="km-title">Aucune touche choisie</h2>
+          <input type="search" id="km-search" placeholder="Rechercher une action" disabled>
+          <div class="actions" id="km-actions"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Système -->
+    <section class="view" id="view-system">
+      <h1>Système</h1>
+      <p class="lead">Informations du clavier et réglages généraux.</p>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Clavier</h2>
+          <dl class="info" id="sys-info"><dt>État</dt><dd>Non connecté</dd></dl>
+          <div class="row" style="margin-top: 14px;"><button class="btn" id="sys-refresh">Actualiser</button></div>
+        </div>
+        <div class="card">
+          <div class="field"><div class="label">Mise en veille</div><div class="seg" id="sys-sleep"></div></div>
+          <div class="field"><label for="sys-layout">Disposition des touches</label><select id="sys-layout"></select></div>
+          <div class="field"><div class="label">Réglages de cette page</div>
+            <div class="row"><button class="btn" id="sys-export">Exporter</button><label class="btn">Importer<input type="file" id="sys-import" accept="application/json" hidden></label></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row" style="justify-content: space-between;">
+          <label class="switch"><input type="checkbox" id="sys-log-on"> Journal des échanges USB</label>
+          <button class="btn" id="sys-log-copy">Copier le journal</button>
+        </div>
+        <div class="log hidden" id="sys-log" style="margin-top: 12px;"></div>
+      </div>
+    </section>
+
+    <!-- Accueil (non connecté) -->
+    <section class="view" id="view-welcome">
+      <div class="welcome">
+        <div class="card">
+          <h1>Brancher le clavier</h1>
+          <ol>
+            <li>Reliez l'AK820 Pro en USB (le câble, pas le Bluetooth ni le dongle 2,4 GHz, pour l'écran).</li>
+            <li>Cliquez sur « Connecter » et choisissez « AK820 » dans la liste.</li>
+            <li>Fermez le logiciel Ajazz s'il est ouvert : il bloque l'accès au clavier.</li>
+          </ol>
+          <div class="row" style="margin-top: 18px;">
+            <button class="btn primary" id="welcome-connect">Connecter</button>
+            <a class="btn" href="?demo=a">Essayer sans clavier</a>
+          </div>
+          <p class="note warn hidden" id="no-webhid" style="margin-top: 16px;"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<dialog id="confirm"><h2></h2><p></p><div class="row end"><button class="btn" value="cancel">Annuler</button><button class="btn primary" value="ok">Continuer</button></div></dialog>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

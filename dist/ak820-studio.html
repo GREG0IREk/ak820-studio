@@ -1,0 +1,2306 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AK820 Studio</title>
+<meta name="description" content="Réglages de l'Ajazz AK820 Pro dans le navigateur : éclairage, couleurs par touche, écran, réaffectation des touches.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b4cdb' stroke-width='2' stroke-linecap='round'%3E%3Crect x='2' y='6' width='20' height='13' rx='2'/%3E%3Cpath d='M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f4f4f6;
+  --panel: #ffffff;
+  --panel-2: #f0f0f3;
+  --line: #dcdce2;
+  --text: #17171c;
+  --muted: #62626e;
+  --accent: #5b4cdb;
+  --accent-text: #ffffff;
+  --accent-soft: #ebe8ff;
+  --danger: #c4312b;
+  --ok: #1d7f4b;
+  --key: #fbfbfc;
+  --key-edge: #cfcfd8;
+  --deck: #e6e6eb;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 16px rgb(0 0 0 / 5%);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #111115;
+    --panel: #1a1a20;
+    --panel-2: #23232b;
+    --line: #2f2f39;
+    --text: #ececf1;
+    --muted: #9a9aa8;
+    --accent: #8b7fff;
+    --accent-text: #0f0d24;
+    --accent-soft: #2a2550;
+    --danger: #ff6b63;
+    --ok: #4fd18b;
+    --key: #2a2a33;
+    --key-edge: #3a3a46;
+    --deck: #18181d;
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg { display: block; }
+
+/* ---------- structure */
+.top {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 650; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+.brand svg { width: 22px; height: 22px; color: var(--accent); }
+.top .spacer { flex: 1; }
+.status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); min-width: 0; }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
+.status.on .dot { background: var(--ok); }
+.status span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 24px; max-width: 1320px; margin: 0 auto; padding: 24px 20px 64px; }
+nav.side { position: sticky; top: 76px; align-self: start; display: grid; gap: 2px; }
+nav.side button {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border: 0; border-radius: 8px; background: none; text-align: left; color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+nav.side button svg { width: 18px; height: 18px; flex: none; }
+nav.side button:hover { background: var(--panel-2); color: var(--text); }
+nav.side button[aria-current='page'] { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+nav.side button[aria-current='page'] svg { color: var(--accent); }
+nav.side button:disabled { opacity: 0.4; cursor: default; }
+main { min-width: 0; }
+
+section.view { display: none; }
+section.view.active { display: block; animation: fade 0.18s ease-out; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+h1 { font-size: 22px; letter-spacing: -0.015em; margin: 0 0 4px; }
+.lead { color: var(--muted); margin: 0 0 20px; max-width: 68ch; }
+h2 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+.card + .card, .stack > * + * { margin-top: 16px; }
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
+.grid-2 > .card + .card { margin-top: 0; }
+.grid-2 + .card { margin-top: 16px; }
+.km-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.km-grid > .card + .card { margin-top: 0; }
+@media (min-width: 1500px) { .km-grid { grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr); align-items: start; } }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.row.end { justify-content: flex-end; }
+.field + .field { margin-top: 16px; }
+.field > label, .field > .label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.note { font-size: 13px; color: var(--muted); }
+.note.warn { color: var(--danger); }
+.hidden { display: none !important; }
+
+/* ---------- boutons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 38px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel); font-weight: 550;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn:hover { background: var(--panel-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.primary:hover { background: color-mix(in srgb, var(--accent) 88%, black); }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.busy { pointer-events: none; opacity: 0.7; }
+
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--panel-2); border-radius: 8px; padding: 3px; gap: 2px; max-width: 100%; }
+.seg button { min-width: 38px; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--muted); font-weight: 550; white-space: nowrap; transition: background 0.15s, color 0.15s; }
+.seg button[aria-pressed='true'] { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 12%); }
+.seg button:disabled { opacity: 0.4; cursor: default; }
+
+.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.switch input { appearance: none; width: 36px; height: 20px; border-radius: 10px; background: var(--line); position: relative; margin: 0; transition: background 0.15s; cursor: pointer; }
+.switch input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgb(0 0 0 / 25%); }
+.switch input:checked { background: var(--accent); }
+.switch input:checked::after { transform: translateX(16px); }
+
+input[type='range'] { width: 100%; accent-color: var(--accent); }
+select { min-height: 38px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
+input[type='search'] { width: 100%; min-height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
+
+/* ---------- couleurs */
+.colors { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); padding: 0; transition: box-shadow 0.15s; }
+.swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--accent); }
+.picker { position: relative; width: 30px; height: 30px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1px var(--line); display: grid; place-items: center; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+.picker input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; border: 0; padding: 0; }
+.picker svg { width: 14px; height: 14px; color: #fff; filter: drop-shadow(0 0 1px rgb(0 0 0 / 60%)); pointer-events: none; }
+.hex { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+
+/* ---------- effets */
+.effects { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.effect {
+  display: grid; grid-template-rows: 34px auto; gap: 8px; align-items: center;
+  padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); text-align: left; font-size: 13px; font-weight: 550;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.effect:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.effect[aria-pressed='true'] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.effect canvas { width: 100%; height: 34px; border-radius: 5px; background: #0d0d12; }
+
+.reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.22s ease, opacity 0.22s ease; opacity: 0; }
+.reveal > div { overflow: hidden; }
+.reveal.open { grid-template-rows: 1fr; opacity: 1; }
+
+/* ---------- clavier */
+.deck { background: var(--deck); border-radius: 14px; padding: 2.2%; container-type: inline-size; }
+.kb { position: relative; width: 100%; aspect-ratio: 16.25 / 6; user-select: none; touch-action: none; }
+.key { position: absolute; padding: 0.25cqw; }
+.key > span {
+  display: flex; align-items: flex-start; justify-content: flex-start; width: 100%; height: 100%;
+  padding: 0.45cqw 0.6cqw; border-radius: 0.7cqw;
+  background: var(--key); border: 1px solid var(--key-edge); border-bottom-width: 0.35cqw;
+  font-size: max(6px, 1.25cqw); line-height: 1.1; color: var(--text); overflow: hidden; white-space: pre-line;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.key.iso > span { clip-path: polygon(0 0, 100% 0, 100% 100%, 16.7% 100%, 16.7% 50%, 0 50%); }
+.kb.paint .key > span { cursor: crosshair; }
+.kb.pick .key > span { cursor: pointer; }
+.kb.pick .key:hover > span { border-color: var(--accent); }
+.key.sel > span { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.key.mod > span { background: var(--accent-soft); border-color: var(--accent); font-weight: 650; }
+.key.na > span { opacity: 0.35; }
+.screen-mark { position: absolute; right: 0; top: -5%; }
+
+/* ---------- écran */
+.tft-wrap { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: start; }
+.tft { width: 256px; height: 256px; image-rendering: pixelated; border-radius: 8px; background: #000; border: 6px solid #0b0b0e; box-sizing: content-box; }
+.drop { display: grid; place-items: center; gap: 8px; padding: 26px; border: 1.5px dashed var(--line); border-radius: var(--radius); text-align: center; color: var(--muted); transition: border-color 0.15s, background 0.15s; cursor: pointer; }
+.drop svg { width: 26px; height: 26px; color: var(--accent); }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.progress { height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.progress > div { height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
+
+/* ---------- touches */
+.picker-panel { max-height: 520px; display: flex; flex-direction: column; }
+.actions { overflow: auto; margin-top: 10px; padding-right: 4px; }
+.actions h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 14px 0 6px; font-weight: 600; }
+.actions .list { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); font-size: 13px; transition: border-color 0.12s, background 0.12s; }
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+
+/* ---------- divers */
+dl.info { display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; margin: 0; font-size: 14px; }
+dl.info dt { color: var(--muted); }
+dl.info dd { margin: 0; font-variant-numeric: tabular-nums; }
+.log { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--panel-2); border-radius: 8px; padding: 10px; max-height: 260px; overflow: auto; white-space: pre; color: var(--muted); }
+.banner { padding: 10px 14px; border-radius: 9px; background: var(--accent-soft); font-size: 14px; margin-bottom: 18px; display: flex; gap: 10px; align-items: flex-start; }
+.banner svg { width: 18px; height: 18px; flex: none; color: var(--accent); margin-top: 1px; }
+.banner.warn { background: color-mix(in srgb, var(--danger) 12%, var(--panel)); }
+.banner.warn svg { color: var(--danger); }
+
+.welcome { max-width: 640px; margin: 6vh auto 0; text-align: left; }
+.welcome .card { padding: 26px; }
+.welcome ol { padding-left: 20px; color: var(--muted); }
+.welcome ol li + li { margin-top: 4px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 20px; z-index: 50; transform: translate(-50%, 20px);
+  max-width: min(560px, calc(100vw - 32px)); padding: 11px 16px; border-radius: 10px;
+  background: var(--text); color: var(--bg); font-size: 14px; box-shadow: 0 6px 24px rgb(0 0 0 / 25%);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.err { background: var(--danger); color: #fff; }
+
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); padding: 22px; max-width: min(460px, calc(100vw - 32px)); box-shadow: 0 12px 40px rgb(0 0 0 / 30%); }
+dialog::backdrop { background: rgb(0 0 0 / 40%); }
+dialog h2 { font-size: 17px; }
+dialog p { color: var(--muted); margin: 0 0 18px; }
+
+/* ---------- petits écrans */
+@media (max-width: 1100px) {
+  .grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); padding: 0 16px 48px; gap: 0; }
+  nav.side {
+    position: sticky; top: 59px; z-index: 15; display: flex; overflow-x: auto; gap: 4px;
+    margin: 0 -16px 18px; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  nav.side button { flex: none; padding: 7px 11px; }
+  .top { padding: 10px 16px; }
+  .tft-wrap { grid-template-columns: minmax(0, 1fr); }
+  .tft { width: 192px; height: 192px; }
+  h1 { font-size: 20px; }
+  .effects { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .status span { display: none; }
+  .card { padding: 14px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10"/></svg>
+    AK820 Studio
+  </div>
+  <div class="spacer"></div>
+  <div class="status" id="status"><i class="dot"></i><span>Non connecté</span></div>
+  <button class="btn primary" id="connect">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 7V2M15 7V2M6 7h12v5a6 6 0 0 1-12 0zM12 18v4"/></svg>
+    <span>Connecter</span>
+  </button>
+</header>
+
+<div class="layout">
+  <nav class="side" id="nav" aria-label="Sections">
+    <button data-view="lighting" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>Éclairage</button>
+    <button data-view="perkey"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.6 3.4 6 6L10 20H4v-6z"/><path d="m12.5 5.5 6 6"/></svg>Touche par touche</button>
+    <button data-view="screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m4 16 4-4 4 4 3-3 5 5"/><circle cx="15" cy="9" r="1.5"/></svg>Écran</button>
+    <button data-view="keymap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10l-3-3M17 17H7l3 3"/></svg>Touches</button>
+    <button data-view="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Système</button>
+  </nav>
+
+  <main id="main">
+    <div id="banner"></div>
+
+    <!-- Éclairage -->
+    <section class="view active" id="view-lighting">
+      <h1>Éclairage</h1>
+      <p class="lead" id="lighting-lead">Effet appliqué à tout le clavier.</p>
+      <div class="grid-2">
+        <div class="card"><h2>Effet</h2><div class="effects" id="effects"></div></div>
+        <div class="card">
+          <div class="field">
+            <div class="label">Couleur</div>
+            <div class="colors" id="light-colors"></div>
+          </div>
+          <div class="field">
+            <label class="switch"><input type="checkbox" id="light-rainbow"> Arc-en-ciel à la place de la couleur</label>
+          </div>
+          <div class="field"><div class="label">Luminosité</div><div class="seg" id="light-brightness"></div></div>
+          <div class="field" id="speed-field"><div class="label">Vitesse</div><div class="seg" id="light-speed"></div></div>
+          <div class="reveal" id="dir-reveal"><div><div class="field"><div class="label">Direction</div><div class="seg" id="light-direction"></div></div></div></div>
+          <div class="field row" id="light-apply-row">
+            <button class="btn primary" id="light-apply">Appliquer</button>
+            <span class="note" id="light-note"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Touche par touche -->
+    <section class="view" id="view-perkey">
+      <h1>Touche par touche</h1>
+      <p class="lead">Cliquez ou glissez sur les touches pour les peindre, puis envoyez au clavier.</p>
+      <div class="card">
+        <div class="row" style="justify-content: space-between; margin-bottom: 14px;">
+          <div class="colors" id="pk-colors"></div>
+          <div class="row">
+            <button class="btn" id="pk-fill">Tout remplir</button>
+            <button class="btn" id="pk-clear">Tout éteindre</button>
+          </div>
+        </div>
+        <div class="deck"><div class="kb paint" id="pk-kb"></div></div>
+        <div class="row" style="margin-top: 14px; justify-content: space-between;">
+          <div class="row">
+            <span class="note">Modèles</span>
+            <button class="btn" data-preset="rainbow">Arc-en-ciel</button>
+            <button class="btn" data-preset="gaming">ZQSD</button>
+            <button class="btn" data-preset="rows">Rangées</button>
+          </div>
+          <div class="row">
+            <span class="note">Luminosité</span>
+            <div class="seg" id="pk-brightness"></div>
+          </div>
+        </div>
+        <p class="note warn hidden" id="pk-iso-note">Sur ce firmware, la correspondance des LED n'est connue que pour la disposition ANSI : la touche « &lt; &gt; » n'est pas pilotée.</p>
+        <div class="row end" style="margin-top: 16px;">
+          <button class="btn" id="pk-read">Lire depuis le clavier</button>
+          <button class="btn primary" id="pk-send">Envoyer au clavier</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Écran -->
+    <section class="view" id="view-screen">
+      <h1>Écran</h1>
+      <p class="lead">Image ou GIF animé sur l'écran 128 × 128. Le cadrage et les couleurs de l'aperçu sont ceux de l'écran.</p>
+      <div class="card">
+        <div class="tft-wrap">
+          <div class="stack">
+            <canvas class="tft" id="tft-preview" width="128" height="128"></canvas>
+            <p class="note" id="tft-meta">Aucune image</p>
+          </div>
+          <div>
+            <label class="drop" id="drop">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+              <span><b>Choisir un fichier</b> ou le déposer ici</span>
+              <span class="note">PNG, JPEG, GIF, WebP</span>
+              <input type="file" id="tft-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+            </label>
+            <div id="tft-opts" class="hidden">
+              <div class="field" style="margin-top: 16px;"><div class="label">Cadrage</div>
+                <div class="seg" id="tft-fit"><button data-v="cover">Remplir</button><button data-v="contain">Contenir</button></div></div>
+              <div class="field"><label for="tft-zoom">Zoom</label><input type="range" id="tft-zoom" min="1" max="3" step="0.05" value="1"></div>
+              <div class="field"><label for="tft-x">Position horizontale</label><input type="range" id="tft-x" min="-1" max="1" step="0.02" value="0"></div>
+              <div class="field"><label for="tft-y">Position verticale</label><input type="range" id="tft-y" min="-1" max="1" step="0.02" value="0"></div>
+              <div class="field"><div class="label">Fond</div><div class="colors" id="tft-bg"></div></div>
+              <div class="field"><div class="label">Vitesse de l'animation</div>
+                <div class="seg" id="tft-speed"><button data-v="0.5">× 0,5</button><button data-v="1">× 1</button><button data-v="1.5">× 1,5</button><button data-v="2">× 2</button></div></div>
+            </div>
+            <div class="field">
+              <div class="progress hidden" id="tft-progress"><div></div></div>
+            </div>
+            <div class="row" style="margin-top: 16px;">
+              <button class="btn primary" id="tft-send" disabled>Envoyer à l'écran</button>
+              <button class="btn" id="tft-clock">Mettre l'horloge à l'heure</button>
+              <button class="btn" id="tft-factory">Animation d'origine</button>
+            </div>
+            <p class="note" style="margin-top: 12px;">Fn + Suppr bascule l'écran entre l'horloge et votre image.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Touches -->
+    <section class="view" id="view-keymap">
+      <h1>Touches</h1>
+      <p class="lead">Choisissez une touche, puis l'action qu'elle doit envoyer. Les changements restent sur le clavier, quel que soit l'ordinateur.</p>
+      <div id="keymap-unsupported" class="banner warn hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>La réaffectation n'est pas décodée pour le firmware de ce clavier (interface 0xFF13). Éclairage, couleurs par touche, écran et veille fonctionnent.</span></div>
+      <div class="km-grid" id="keymap-body">
+        <div class="card">
+          <div class="row" style="justify-content: space-between; margin-bottom: 14px;">
+            <div class="seg" id="km-layer"><button data-v="base" aria-pressed="true">Couche normale</button><button data-v="fn">Couche Fn</button></div>
+            <span class="note" id="km-count"></span>
+          </div>
+          <div class="deck"><div class="kb pick" id="km-kb"></div></div>
+          <div class="row end" style="margin-top: 16px;">
+            <button class="btn" id="km-factory">Valeurs d'usine</button>
+            <button class="btn" id="km-revert" disabled>Annuler</button>
+            <button class="btn primary" id="km-write" disabled>Écrire sur le clavier</button>
+          </div>
+        </div>
+        <div class="card picker-panel">
+          <h2 id="km-title">Aucune touche choisie</h2>
+          <input type="search" id="km-search" placeholder="Rechercher une action" disabled>
+          <div class="actions" id="km-actions"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Système -->
+    <section class="view" id="view-system">
+      <h1>Système</h1>
+      <p class="lead">Informations du clavier et réglages généraux.</p>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Clavier</h2>
+          <dl class="info" id="sys-info"><dt>État</dt><dd>Non connecté</dd></dl>
+          <div class="row" style="margin-top: 14px;"><button class="btn" id="sys-refresh">Actualiser</button></div>
+        </div>
+        <div class="card">
+          <div class="field"><div class="label">Mise en veille</div><div class="seg" id="sys-sleep"></div></div>
+          <div class="field"><label for="sys-layout">Disposition des touches</label><select id="sys-layout"></select></div>
+          <div class="field"><div class="label">Réglages de cette page</div>
+            <div class="row"><button class="btn" id="sys-export">Exporter</button><label class="btn">Importer<input type="file" id="sys-import" accept="application/json" hidden></label></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row" style="justify-content: space-between;">
+          <label class="switch"><input type="checkbox" id="sys-log-on"> Journal des échanges USB</label>
+          <button class="btn" id="sys-log-copy">Copier le journal</button>
+        </div>
+        <div class="log hidden" id="sys-log" style="margin-top: 12px;"></div>
+      </div>
+    </section>
+
+    <!-- Accueil (non connecté) -->
+    <section class="view" id="view-welcome">
+      <div class="welcome">
+        <div class="card">
+          <h1>Brancher le clavier</h1>
+          <ol>
+            <li>Reliez l'AK820 Pro en USB (le câble, pas le Bluetooth ni le dongle 2,4 GHz, pour l'écran).</li>
+            <li>Cliquez sur « Connecter » et choisissez « AK820 » dans la liste.</li>
+            <li>Fermez le logiciel Ajazz s'il est ouvert : il bloque l'accès au clavier.</li>
+          </ol>
+          <div class="row" style="margin-top: 18px;">
+            <button class="btn primary" id="welcome-connect">Connecter</button>
+            <a class="btn" href="?demo=a">Essayer sans clavier</a>
+          </div>
+          <p class="note warn hidden" id="no-webhid" style="margin-top: 16px;"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<dialog id="confirm"><h2></h2><p></p><div class="row end"><button class="btn" value="cancel">Annuler</button><button class="btn primary" value="ok">Continuer</button></div></dialog>
+
+<script type="module">
+const __mod = {};
+// ---- protocol.js
+__mod.protocol = (() => {
+// Protocole HID de l'Ajazz / Epomaker AK820 Pro.
+//
+// Porté depuis wsclx/ak820pro-modder (MIT), crates/ak820-protocol :
+// protocol.rs, commands/*.rs, legacy.rs, legacy_tft.rs, legacy_rgb.rs.
+// Deux familles de firmware incompatibles, reconnues par leurs interfaces HID :
+//   A : contrôle 0xFF68 (rapports de sortie 64 o, trames AA/55), écran 0xFF67 (4104 o)
+//   B : contrôle 0xFF13 (rapports feature 64 o, préfixe 04), écran 0xFF68 (4096 o)
+// Ce module ne touche pas au DOM : il est testé sous Node (test/protocol.test.mjs).
+
+const VENDOR_ID = 0x0c45;
+const PRODUCT_IDS = [0x8009, 0x800a, 0xfefe];
+const CONTROL_USAGE_PAGES = [0xff68, 0xff80, 0xff60, 0xff00, 0xff01, 0xff1b];
+const PAGE_FEATURE = 0xff13;
+const PAGE_TFT_A = 0xff67;
+const PAGE_TFT_B = 0xff68;
+
+const FAMILY_A = 'A';
+const FAMILY_B = 'B';
+
+// ---------------------------------------------------------------- famille A
+
+const PACKET_LEN = 64;
+const HEADER_LEN = 8;
+const PAYLOAD_PER_PACKET = PACKET_LEN - HEADER_LEN; // 56
+
+const CMD = {
+  COMMUNICATION_START: 1,
+  COMMUNICATION_END: 2,
+  SET_FACTORY_RESET: 15,
+  GET_DEVICE_INFO: 16,
+  GET_GAME_MODE: 17,
+  GET_KEY: 18,
+  GET_LED_EFFECT: 19,
+  GET_CUSTOM_LED_DATA: 20,
+  GET_MACRO: 21,
+  GET_FN_KEY: 22,
+  GET_DEFAULT_FN_KEY_MATRIX: 28,
+  GET_DEFAULT_KEY_MATRIX: 31,
+  SET_GAME_MODE: 33,
+  SET_KEY: 34,
+  SET_LED_EFFECT: 35,
+  SET_CUSTOM_LED_DATA: 36,
+  SET_MACRO: 37,
+  SET_FN_KEY: 38,
+  SET_TEMPORARY_COMMAND_DATA: 52,
+  SET_LED_BOOT_ANIMATION: 64,
+  SET_LED_USER_ANIMATION: 65,
+  SET_TFT_USER_ANIMATION: 80,
+  SET_TFT_BUILT_IN_INDEX: 81,
+};
+
+/** Trame sortante de 64 octets : [AA, cmd, len, addrLo, addrHi, 0, last, 0, payload…]. */
+function buildFrame(cmd, lenOrType, addr, payload = [], lastPacket = true) {
+  const p = new Uint8Array(PACKET_LEN);
+  p[0] = 0xaa;
+  p[1] = cmd;
+  p[2] = lenOrType & 0xff;
+  p[3] = addr & 0xff;
+  p[4] = (addr >> 8) & 0xff;
+  p[6] = lastPacket ? 1 : 0;
+  p.set(Array.from(payload).slice(0, PAYLOAD_PER_PACKET), HEADER_LEN);
+  return p;
+}
+
+// Effets : même numérotation sur les deux familles.
+const MODES = [
+  { id: 0x00, key: 'off', name: 'Éteint' },
+  { id: 0x01, key: 'static', name: 'Fixe' },
+  { id: 0x02, key: 'single-on', name: 'Allumage à la frappe' },
+  { id: 0x03, key: 'single-off', name: 'Extinction à la frappe' },
+  { id: 0x04, key: 'glittering', name: 'Scintillement' },
+  { id: 0x05, key: 'falling', name: 'Pluie' },
+  { id: 0x06, key: 'colourful', name: 'Multicolore' },
+  { id: 0x07, key: 'breath', name: 'Respiration' },
+  { id: 0x08, key: 'spectrum', name: 'Spectre' },
+  { id: 0x09, key: 'outward', name: 'Vague centrale' },
+  { id: 0x0a, key: 'scrolling', name: 'Défilement' },
+  { id: 0x0b, key: 'rolling', name: 'Roulement' },
+  { id: 0x0c, key: 'rotating', name: 'Rotation' },
+  { id: 0x0d, key: 'explode', name: 'Explosion' },
+  { id: 0x0e, key: 'launch', name: 'Lancement' },
+  { id: 0x0f, key: 'ripples', name: 'Ondulations' },
+  { id: 0x10, key: 'flowing', name: 'Flux' },
+  { id: 0x11, key: 'pulsating', name: 'Pulsation' },
+  { id: 0x12, key: 'tilt', name: 'Bascule' },
+  { id: 0x13, key: 'shuttle', name: 'Navette' },
+];
+const MODE_CUSTOM = 0x80;
+
+const DIRECTION = { left: 0, down: 1, up: 2, right: 3 };
+
+/** Directions qu'un effet accepte (vide : aucune). */
+function supportedDirections(mode) {
+  if (mode === 0x0a) return ['up', 'down'];
+  if (mode === 0x0b || mode === 0x10 || mode === 0x12) return ['left', 'right'];
+  return [];
+}
+
+function parseHex(hex) {
+  const s = String(hex || '').trim().replace(/^#/, '');
+  if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+  return [0, 2, 4].map((i) => parseInt(s.slice(i, i + 2), 16));
+}
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v | 0));
+
+/**
+ * Charge utile SET_LED_EFFECT (16 octets).
+ * cfg = { mode, color:'#rrggbb', secondary?, colorMode (0 mono, 1 arc-en-ciel),
+ *         brightness 0-5, speed 0-5, direction 'left'|'down'|'up'|'right', effectModeType? }
+ */
+function ledEffectPayload(cfg) {
+  const [r, g, b] = parseHex(cfg.color) || [255, 255, 255];
+  const [sr, sg, sb] = parseHex(cfg.secondary) || [0, 0, 0];
+  const p = new Uint8Array(16);
+  p[0] = cfg.mode;
+  p[1] = r; p[2] = g; p[3] = b;
+  p[4] = 0xff; // driverSetting, fixé par le pilote officiel
+  p[5] = sr; p[6] = sg; p[7] = sb;
+  p[8] = cfg.colorMode | 0;
+  p[9] = clamp(cfg.brightness, 0, 5);
+  p[10] = clamp(cfg.speed, 0, 5);
+  p[11] = DIRECTION[cfg.direction] ?? 0;
+  p[12] = cfg.effectModeType | 0;
+  p[14] = 0xaa;
+  p[15] = 0x55;
+  return p;
+}
+
+/** GET_DEVICE_INFO (48 octets). */
+function parseDeviceInfo(b) {
+  const g = (i) => b[i] ?? 0;
+  const w = (i) => g(i) | (g(i + 1) << 8);
+  const v8 = g(8);
+  const raw = (v8 & 0x0f) + ((v8 & 0xf0) >> 4) * 10 + g(9) * 100;
+  return {
+    romSize: g(0),
+    macroSpaceSize: w(2),
+    vid: w(4),
+    pid: w(6),
+    firmware: (raw / 100).toFixed(2),
+    workMode: g(16),
+    batteryLevel: g(17),
+    chargeStatus: g(18),
+    currentProfile: g(19),
+    tftMaxFrames: w(22),
+    gifMaxFrames: w(24),
+    tftDirection: g(28),
+  };
+}
+
+/** GET_GAME_MODE / SET_GAME_MODE (56 octets). On ne modifie que l'octet 3 (veille). */
+const SLEEP_A = [
+  { value: 0, label: 'Jamais' },
+  { value: 1, label: '1 min' },
+  { value: 2, label: '5 min' },
+  { value: 3, label: '10 min' },
+  { value: 4, label: '15 min' },
+  { value: 5, label: '30 min' },
+];
+const SLEEP_B = [
+  { value: 0, label: 'Jamais' },
+  { value: 1, label: '1 min' },
+  { value: 5, label: '5 min' },
+  { value: 30, label: '30 min' },
+];
+
+/** Horloge de l'écran : [5A, 01, 5A, AA, MM, JJ, hh, mm, ss, jour (dim = 0)]. */
+function clockPayload(d) {
+  const y = d.getFullYear();
+  if (y < 2000 || y > 2099) throw new Error('Année hors plage 2000-2099');
+  return new Uint8Array([
+    0x5a, 0x01, 0x5a, y % 100, d.getMonth() + 1, d.getDate(),
+    d.getHours(), d.getMinutes(), d.getSeconds(), d.getDay(),
+  ]);
+}
+
+// Touche par touche (A) : 128 LED × [index, r, g, b].
+const LED_COUNT = 128;
+function encodeCustomLeds(colors) {
+  const out = new Uint8Array(LED_COUNT * 4);
+  for (let i = 0; i < LED_COUNT; i++) {
+    const c = colors[i] || [0, 0, 0];
+    out.set([i, c[0], c[1], c[2]], i * 4);
+  }
+  return out;
+}
+function decodeCustomLeds(bytes) {
+  const colors = [];
+  for (let i = 0; i < LED_COUNT; i++) {
+    const o = i * 4;
+    colors.push(o + 4 <= bytes.length ? [bytes[o + 1], bytes[o + 2], bytes[o + 3]] : [0, 0, 0]);
+  }
+  return colors;
+}
+
+// Réaffectation des touches (A) : 128 emplacements × 4 octets.
+const KEYMAP_BYTES = 512;
+const PAGE = { DEFAULT: 0, MOUSE: 1, KEYBOARD: 2, CONSUMER: 3, SYSTEM: 4, MACRO: 6 };
+
+function decodeKeyAction(b0, b1, b2, b3) {
+  if (b0 === 0) return { kind: 'default' };
+  if (b0 === 2) return { kind: 'keyboard', usage: b2 };
+  if (b0 === 3) return { kind: 'consumer', value: b1 | (b2 << 8) };
+  if (b0 === 1) return { kind: 'mouse', button: b1, value: b2 };
+  return { kind: 'raw', bytes: [b0, b1, b2, b3] };
+}
+function encodeKeyAction(a) {
+  switch (a.kind) {
+    case 'default': return [0, 0, 0, 0];
+    case 'keyboard': return [2, 0, a.usage & 0xff, 0];
+    case 'consumer': return [3, a.value & 0xff, (a.value >> 8) & 0xff, 0];
+    case 'mouse': return [1, a.button & 0xff, (a.value ?? 0) & 0xff, 0];
+    default: return a.bytes.slice(0, 4);
+  }
+}
+function decodeKeymap(bytes) {
+  const slots = [];
+  for (let i = 0; i < 128; i++) {
+    const o = i * 4;
+    slots.push(decodeKeyAction(bytes[o] ?? 0, bytes[o + 1] ?? 0, bytes[o + 2] ?? 0, bytes[o + 3] ?? 0));
+  }
+  return slots;
+}
+function encodeKeymap(slots) {
+  const out = new Uint8Array(KEYMAP_BYTES);
+  slots.slice(0, 128).forEach((a, i) => out.set(encodeKeyAction(a), i * 4));
+  return out;
+}
+
+// ---------------------------------------------------------------- écran
+
+const TFT_SIZE = 128;
+const FRAME_BYTES = TFT_SIZE * TFT_SIZE * 2;
+const TFT_HEADER_BYTES = 256;
+
+function rgb565(r, g, b) {
+  return ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+}
+
+/** RGBA 128×128 (ImageData.data) vers RGB565 petit-boutiste, fond noir sous la transparence. */
+function rgbaToRgb565(rgba) {
+  const out = new Uint8Array(FRAME_BYTES);
+  for (let i = 0, o = 0; i < rgba.length; i += 4, o += 2) {
+    const a = rgba[i + 3] / 255;
+    const v = rgb565(Math.round(rgba[i] * a), Math.round(rgba[i + 1] * a), Math.round(rgba[i + 2] * a));
+    out[o] = v & 0xff;
+    out[o + 1] = v >> 8;
+  }
+  return out;
+}
+
+/**
+ * Famille A : en-tête de 256 o (nb d'images, N-1 délais en unités de 5 ms, terminateur 0,
+ * bourrage FF) puis les images RGB565. frames = [{ pixels: Uint8Array(32768), delayMs }].
+ */
+function encodeAnimationA(frames) {
+  if (!frames.length) throw new Error('Aucune image');
+  if (frames.length > 255) throw new Error('255 images au plus');
+  const n = frames.length;
+  const out = new Uint8Array(TFT_HEADER_BYTES + n * FRAME_BYTES);
+  out.fill(0xff, 0, TFT_HEADER_BYTES);
+  out[0] = n;
+  for (let i = 0; i < n - 1; i++) out[i + 1] = Math.min(255, Math.floor(frames[i].delayMs / 5));
+  out[n] = 0;
+  frames.forEach((f, i) => out.set(f.pixels, TFT_HEADER_BYTES + i * FRAME_BYTES));
+  return out;
+}
+
+/** En-tête de bloc famille A : [AA, 50, idxLo, idxHi, totLo, totHi, 50, 06]. */
+function tftChunkHeader(index, total) {
+  return new Uint8Array([0xaa, CMD.SET_TFT_USER_ANIMATION, index & 0xff, index >> 8, total & 0xff, total >> 8, 0x50, 0x06]);
+}
+
+const LEGACY_CHUNK = 4096;
+const LEGACY_MAX_FRAMES = 30;
+
+/** Famille B : tous les délais en unités de 2 ms, pas d'en-tête par bloc, bourrage FF au multiple de 4096. */
+function encodeAnimationB(frames) {
+  if (!frames.length) throw new Error('Aucune image');
+  if (frames.length > LEGACY_MAX_FRAMES) throw new Error(`${LEGACY_MAX_FRAMES} images au plus`);
+  const n = frames.length;
+  const len = TFT_HEADER_BYTES + n * FRAME_BYTES;
+  const out = new Uint8Array(Math.ceil(len / LEGACY_CHUNK) * LEGACY_CHUNK).fill(0xff);
+  out[0] = n;
+  if (n === 1) out[1] = 0;
+  else frames.forEach((f, i) => { out[i + 1] = Math.max(1, Math.min(255, Math.floor(f.delayMs / 2))); });
+  frames.forEach((f, i) => out.set(f.pixels, TFT_HEADER_BYTES + i * FRAME_BYTES));
+  return out;
+}
+
+// ---------------------------------------------------------------- famille B
+
+const B = { START: 0x18, COMMIT: 0x02, FINISH: 0xf0, LIGHTING: 0x13, CUSTOM_BANK: 0x23, SLEEP: 0x17, CLOCK: 0x28, IMAGE_CFG: 0x72 };
+
+function controlPacket(command, sub, value) {
+  const p = new Uint8Array(64);
+  p[0] = 4;
+  p[1] = command;
+  p[2] = sub;
+  p[8] = value & 0xff;
+  p[9] = (value >> 8) & 0xff;
+  return p;
+}
+
+/** Effet famille B. Éteint = SingleOn luminosité 0 ; Fixe = Respiration vitesse 0. */
+function legacyLightingPacket(cfg) {
+  if (cfg.mode === MODE_CUSTOM) throw new Error('Le mode personnalisé passe par legacySelectCustom');
+  let mode = cfg.mode, speed = clamp(cfg.speed, 0, 5), brightness = clamp(cfg.brightness, 0, 5);
+  if (mode === 0x00) { mode = 0x02; speed = 0; brightness = 0; }
+  else if (mode === 0x01) { mode = 0x07; speed = 0; }
+  const [r, g, b] = parseHex(cfg.color) || [255, 255, 255];
+  const p = new Uint8Array(64);
+  p[0] = mode;
+  p[1] = r; p[2] = g; p[3] = b;
+  p[8] = cfg.colorMode ? 1 : 0;
+  p[9] = brightness;
+  p[10] = speed;
+  p[11] = DIRECTION[cfg.direction] ?? 0;
+  p[14] = 0x55;
+  p[15] = 0xaa;
+  return p;
+}
+
+function legacySleepPacket(minutes) {
+  const code = { 0: 0, 1: 1, 5: 2, 30: 3 }[minutes];
+  if (code === undefined) throw new Error('Veille : 0, 1, 5 ou 30 minutes');
+  const p = new Uint8Array(64);
+  p[8] = code;
+  p[62] = 0xaa; p[63] = 0x55;
+  return p;
+}
+
+function legacyClockPacket(d) {
+  const web = clockPayload(d);
+  const p = new Uint8Array(64);
+  p.set(web.slice(1, 9), 1);
+  p[10] = 4;
+  p[62] = 0xaa; p[63] = 0x55;
+  return p;
+}
+
+/** (emplacement commun, index LED du firmware B), clavier ANSI, d'après le pilote 1.0.0.5. */
+const ANSI_LED_SLOTS = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [12, 13], [106, 119],
+  [16, 19], [17, 20], [18, 21], [19, 22], [20, 23], [21, 24], [22, 25], [23, 26], [24, 27], [25, 28], [26, 29], [27, 30], [28, 31], [92, 103], [107, 117],
+  [32, 37], [33, 38], [34, 39], [35, 40], [36, 41], [37, 42], [38, 43], [39, 44], [40, 45], [41, 46], [42, 47], [43, 48], [44, 49], [97, 67], [105, 118],
+  [48, 55], [49, 56], [50, 57], [51, 58], [52, 59], [53, 60], [54, 61], [55, 62], [56, 63], [57, 64], [58, 65], [59, 66], [76, 85], [108, 121],
+  [64, 73], [65, 74], [66, 75], [67, 76], [68, 77], [69, 78], [70, 79], [71, 80], [72, 81], [73, 82], [74, 83], [75, 84], [90, 101],
+  [80, 91], [81, 92], [82, 93], [83, 94], [84, 95], [85, 96], [87, 98], [88, 99], [89, 100], [91, 102],
+];
+
+function legacyEncodeBank(colors) {
+  const data = new Uint8Array(576);
+  for (const [slot, id] of ANSI_LED_SLOTS) {
+    const c = colors[slot] || [0, 0, 0];
+    data.set([id, c[0], c[1], c[2]], id * 4);
+  }
+  data[574] = 0xaa; data[575] = 0x55;
+  return data;
+}
+
+function legacyCustomModePacket(brightness) {
+  const p = new Uint8Array(64);
+  p[0] = 0x80;
+  p[9] = clamp(brightness, 0, 5);
+  p[14] = 0xaa; p[15] = 0x55;
+  return p;
+}
+
+function parseLegacyBattery(r) {
+  // r : 64 octets sans l'identifiant de rapport.
+  const raw = r.length >= 4 && r[0] === 0x20 && r[1] === 1 ? r[3] : null;
+  return { percent: raw !== null && raw <= 100 ? raw : null, wiredFull: raw === 255 };
+}
+
+// ---------------------------------------------------------------- détection
+
+/** Taille (octets) du plus grand rapport d'un type ('outputReports', 'featureReports'…) d'une collection WebHID. */
+function reportBytes(collection, kind) {
+  let max = 0;
+  for (const rep of collection[kind] || []) {
+    let bits = 0;
+    for (const it of rep.items || []) bits += (it.reportSize || 0) * (it.reportCount || 0);
+    max = Math.max(max, Math.ceil(bits / 8));
+  }
+  return max;
+}
+
+const pagesOf = (dev) => (dev.collections || []).map((c) => c.usagePage);
+
+/**
+ * Classe les HIDDevice WebHID d'un même clavier.
+ * Renvoie { family, control, tft } ou { error }.
+ */
+function classify(devices) {
+  const ak = devices.filter((d) => d.vendorId === VENDOR_ID && PRODUCT_IDS.includes(d.productId));
+  if (!ak.length) return { error: 'Aucun AK820 parmi les appareils autorisés.' };
+  const has = (page) => ak.find((d) => pagesOf(d).includes(page));
+  const feature = has(PAGE_FEATURE);
+  const tftA = has(PAGE_TFT_A);
+  if (feature && !tftA) {
+    // Famille B : écritures en flash, on exige le nom de produit observé (Sonix réutilise ses identifiants).
+    if (!/^AK820/i.test(feature.productName || '')) {
+      return { error: `Interface 0xFF13 trouvée sur « ${feature.productName || 'sans nom'} » : ce n'est pas un AK820, rien n'est envoyé.` };
+    }
+    const tft = ak.find((d) => (d.collections || []).some((c) => c.usagePage === PAGE_TFT_B && reportBytes(c, 'outputReports') === 4096));
+    return { family: FAMILY_B, control: feature, tft: tft || null };
+  }
+  for (const page of CONTROL_USAGE_PAGES) {
+    const control = has(page);
+    if (control) return { family: FAMILY_A, control, tft: tftA || null };
+  }
+  return { error: 'Interface de contrôle introuvable. Autorisez toutes les interfaces du clavier.' };
+}
+
+// ---------------------------------------------------------------- transport
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Enveloppe un HIDDevice (ou un faux appareil de test) :
+ * file d'attente des rapports d'entrée et journal des échanges.
+ */
+class Endpoint {
+  constructor(device, log = () => {}) {
+    this.device = device;
+    this.log = log;
+    this.queue = [];
+    this.waiters = [];
+    this.onInput = (e) => {
+      const data = new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength).slice();
+      this.log('rx', data);
+      const w = this.waiters.findIndex((x) => x.match(data));
+      if (w >= 0) { const [x] = this.waiters.splice(w, 1); x.resolve(data); }
+      else { this.queue.push(data); if (this.queue.length > 64) this.queue.shift(); }
+    };
+  }
+  async open() {
+    if (!this.device.opened) await this.device.open();
+    this.device.addEventListener('inputreport', this.onInput);
+  }
+  async close() {
+    this.device.removeEventListener('inputreport', this.onInput);
+    if (this.device.opened) await this.device.close();
+  }
+  drain() { this.queue.length = 0; }
+  /** Attend un rapport d'entrée qui satisfait match ; null si délai dépassé. */
+  waitInput(match, timeoutMs) {
+    const i = this.queue.findIndex(match);
+    if (i >= 0) return Promise.resolve(this.queue.splice(i, 1)[0]);
+    return new Promise((resolve) => {
+      const waiter = { match, resolve };
+      this.waiters.push(waiter);
+      setTimeout(() => {
+        const k = this.waiters.indexOf(waiter);
+        if (k >= 0) { this.waiters.splice(k, 1); resolve(null); }
+      }, timeoutMs);
+    });
+  }
+  async send(data) {
+    this.log('tx', data);
+    await this.device.sendReport(0, data);
+  }
+  async sendFeature(data) {
+    this.log('txf', data);
+    await this.device.sendFeatureReport(0, data);
+  }
+  async receiveFeature() {
+    const dv = await this.device.receiveFeatureReport(0);
+    let r = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength).slice();
+    // Selon la plateforme, l'identifiant de rapport 0 peut précéder les 64 octets.
+    if (r.length === 65 && r[0] === 0) r = r.slice(1);
+    this.log('rxf', r);
+    return r;
+  }
+}
+
+/** Sérialise les opérations : une seule transaction à la fois sur le clavier. */
+class Mutex {
+  constructor() { this.tail = Promise.resolve(); }
+  run(fn) {
+    const next = this.tail.then(fn, fn);
+    this.tail = next.catch(() => {});
+    return next;
+  }
+}
+
+// ---------------------------------------------------------------- clavier
+
+class Keyboard {
+  /** cls = résultat de classify(). */
+  constructor(cls, log = () => {}) {
+    this.family = cls.family;
+    this.log = log;
+    this.control = new Endpoint(cls.control, (d, b) => log(d, b, 'ctl'));
+    this.tft = cls.tft && cls.tft !== cls.control ? new Endpoint(cls.tft, (d, b) => log(d, b, 'tft')) : (cls.tft ? this.control : null);
+    this.mutex = new Mutex();
+    this.name = cls.control.productName || 'AK820';
+    this.pid = cls.control.productId;
+    const tftCol = cls.tft && (cls.tft.collections || []).find((c) => c.usagePage === (this.family === FAMILY_A ? PAGE_TFT_A : PAGE_TFT_B));
+    this.tftReportLen = (tftCol && reportBytes(tftCol, 'outputReports')) || (this.family === FAMILY_A ? 4104 : 4096);
+  }
+
+  async open() {
+    await this.control.open();
+    if (this.tft && this.tft !== this.control) await this.tft.open();
+  }
+  async close() {
+    await this.control.close().catch(() => {});
+    if (this.tft && this.tft !== this.control) await this.tft.close().catch(() => {});
+  }
+
+  get caps() {
+    const a = this.family === FAMILY_A;
+    return { info: a, keymap: a, perKey: true, perKeyIsoComplete: a, tft: !!this.tft, tftBuiltIn: a, liveLighting: a, secondary: a, sleep: a ? SLEEP_A : SLEEP_B };
+  }
+
+  // ---- famille A : primitives
+
+  async aResponse(cmd, timeout = 500) {
+    return this.control.waitInput((d) => d[0] === 0x55 && d[1] === cmd, timeout);
+  }
+  async aSet(cmd, payload) {
+    this.control.drain();
+    await this.control.send(buildFrame(cmd, payload.length, 0, payload, true));
+    await this.aResponse(cmd); // certains firmwares ne répondent pas aux SET : on n'échoue pas
+  }
+  async aGetMany(cmd, size, base = 0) {
+    const out = new Uint8Array(size);
+    const n = Math.max(1, Math.ceil(size / PAYLOAD_PER_PACKET));
+    for (let i = 0; i < n; i++) {
+      const len = Math.min(PAYLOAD_PER_PACKET, size - i * PAYLOAD_PER_PACKET);
+      this.control.drain();
+      await this.control.send(buildFrame(cmd, len, base + i * PAYLOAD_PER_PACKET, [], i === n - 1));
+      const r = await this.aResponse(cmd);
+      if (!r) throw new Error(`Pas de réponse à la commande 0x${cmd.toString(16)} (interface 0x${this.controlPage().toString(16)})`);
+      out.set(r.slice(HEADER_LEN, HEADER_LEN + len), i * PAYLOAD_PER_PACKET);
+    }
+    return out;
+  }
+  async aSetMany(cmd, payload, base = 0, commit = true) {
+    const n = Math.max(1, Math.ceil(payload.length / PAYLOAD_PER_PACKET));
+    for (let i = 0; i < n; i++) {
+      const start = i * PAYLOAD_PER_PACKET;
+      const chunk = payload.slice(start, start + PAYLOAD_PER_PACKET);
+      this.control.drain();
+      await this.control.send(buildFrame(cmd, chunk.length, base + start, chunk, commit && i === n - 1));
+      await this.aResponse(cmd);
+    }
+  }
+  controlPage() {
+    return (this.control.device.collections || [])[0]?.usagePage ?? 0;
+  }
+
+  // ---- famille B : primitives
+
+  async bExchange(packet) {
+    await sleep(35);
+    await this.control.sendFeature(packet);
+    await sleep(50);
+    const r = await this.control.receiveFeature();
+    if (r.length < 64) throw new Error('Réponse feature trop courte');
+    return r;
+  }
+  bAck(reply, command) {
+    if (reply[0] !== 4 || reply[1] !== command || reply[3] !== 1) {
+      const hex = Array.from(reply.slice(0, 9), (b) => b.toString(16).padStart(2, '0')).join(' ');
+      throw new Error(`Le clavier a refusé la commande 0x${command.toString(16)} (${hex})`);
+    }
+  }
+  async bStart(flag) {
+    for (let i = 1; i < 10; i++) {
+      const r = await this.bExchange(controlPacket(B.START, 0, flag));
+      const busy = r.every((b) => b === 0) || (r[0] === 4 && r[1] === B.START && r[2] === 0 && r[3] === 0xff);
+      if (!busy) return this.bAck(r, B.START);
+      await sleep(300);
+    }
+    this.bAck(await this.bExchange(controlPacket(B.START, 0, flag)), B.START);
+  }
+  /** START, préambule, données, COMMIT, puis FINISH (toujours envoyé, même après une erreur). */
+  async bTransaction(flag, command, dataPackets) {
+    let err = null;
+    try {
+      await this.bStart(flag);
+      this.bAck(await this.bExchange(command), command[1]);
+      for (const p of dataPackets) await this.bExchange(p);
+      this.bAck(await this.bExchange(controlPacket(B.COMMIT, 0, 0)), B.COMMIT);
+    } catch (e) { err = e; }
+    try {
+      this.bAck(await this.bExchange(controlPacket(B.FINISH, 0, flag)), B.FINISH);
+    } catch (e) { err = err || e; }
+    if (err) throw err;
+  }
+
+  // ---- opérations
+
+  info() {
+    return this.mutex.run(async () => {
+      if (this.family === FAMILY_A) {
+        const r = await this.aGetMany(CMD.GET_DEVICE_INFO, 48);
+        return { family: 'A', ...parseDeviceInfo(r) };
+      }
+      await sleep(35);
+      const q = new Uint8Array(64); q[0] = 0x20; q[1] = 1;
+      await this.control.sendFeature(q);
+      await sleep(50);
+      const bat = parseLegacyBattery(await this.control.receiveFeature());
+      return { family: 'B', batteryLevel: bat.percent, wiredFull: bat.wiredFull };
+    });
+  }
+
+  /** Effet actuel (famille A, lecture seule). null si le firmware ne répond pas. */
+  getLighting() {
+    return this.mutex.run(async () => {
+      if (this.family !== FAMILY_A) return null;
+      try {
+        const p = await this.aGetMany(CMD.GET_LED_EFFECT, 16);
+        if (p[14] !== 0xaa || p[15] !== 0x55) return null; // format inattendu : on garde les réglages locaux
+        const hex = (a, b, c) => '#' + [a, b, c].map((v) => v.toString(16).padStart(2, '0')).join('');
+        const dir = Object.keys(DIRECTION).find((k) => DIRECTION[k] === p[11]) || 'left';
+        return { mode: p[0], color: hex(p[1], p[2], p[3]), colorMode: p[8] ? 1 : 0, brightness: Math.min(5, p[9]), speed: Math.min(5, p[10]), direction: dir };
+      } catch { return null; }
+    });
+  }
+
+  setLighting(cfg) {
+    return this.mutex.run(async () => {
+      if (this.family === FAMILY_A) return this.aSet(CMD.SET_LED_EFFECT, ledEffectPayload(cfg));
+      return this.bTransaction(1, controlPacket(B.LIGHTING, 0, 1), [legacyLightingPacket(cfg)]);
+    });
+  }
+
+  /** Écrit les couleurs par touche (tableau de 128 [r,g,b]) puis active le mode personnalisé. */
+  setPerKey(colors, brightness = 5) {
+    return this.mutex.run(async () => {
+      if (this.family === FAMILY_A) {
+        await this.aSetMany(CMD.SET_CUSTOM_LED_DATA, encodeCustomLeds(colors), 0, true);
+        return this.aSet(CMD.SET_LED_EFFECT, ledEffectPayload({ mode: MODE_CUSTOM, color: '#ffffff', brightness, speed: 0, direction: 'left', colorMode: 0 }));
+      }
+      const bank = legacyEncodeBank(colors);
+      const blocks = [];
+      for (let i = 0; i < 9; i++) blocks.push(bank.slice(i * 64, i * 64 + 64));
+      await this.bTransaction(0, controlPacket(B.CUSTOM_BANK, 0, 9), blocks);
+      return this.bTransaction(0, controlPacket(B.LIGHTING, 0, 1), [legacyCustomModePacket(brightness)]);
+    });
+  }
+
+  getPerKey() {
+    return this.mutex.run(async () => {
+      if (this.family !== FAMILY_A) throw new Error('Lecture impossible sur ce firmware');
+      return decodeCustomLeds(await this.aGetMany(CMD.GET_CUSTOM_LED_DATA, 512));
+    });
+  }
+
+  syncClock(date = new Date()) {
+    return this.mutex.run(async () => {
+      if (this.family === FAMILY_A) return this.aSet(CMD.SET_TEMPORARY_COMMAND_DATA, clockPayload(date));
+      return this.bTransaction(1, controlPacket(B.CLOCK, 0, 1), [legacyClockPacket(date)]);
+    });
+  }
+
+  getSleep() {
+    return this.mutex.run(async () => {
+      if (this.family !== FAMILY_A) return null; // pas de relecture connue
+      const gm = await this.aGetMany(CMD.GET_GAME_MODE, 56);
+      return gm[3];
+    });
+  }
+
+  setSleep(value) {
+    return this.mutex.run(async () => {
+      if (this.family === FAMILY_A) {
+        const gm = await this.aGetMany(CMD.GET_GAME_MODE, 56); // on ne change que la veille
+        gm[3] = value;
+        return this.aSet(CMD.SET_GAME_MODE, gm);
+      }
+      return this.bTransaction(1, controlPacket(B.SLEEP, 1, 1), [legacySleepPacket(value)]);
+    });
+  }
+
+  getKeymap(layer = 'base', factory = false) {
+    return this.mutex.run(async () => {
+      if (this.family !== FAMILY_A) throw new Error('Réaffectation non décodée sur ce firmware');
+      const cmd = layer === 'fn'
+        ? (factory ? CMD.GET_DEFAULT_FN_KEY_MATRIX : CMD.GET_FN_KEY)
+        : (factory ? CMD.GET_DEFAULT_KEY_MATRIX : CMD.GET_KEY);
+      return decodeKeymap(await this.aGetMany(cmd, KEYMAP_BYTES));
+    });
+  }
+
+  setKeymap(layer, slots) {
+    return this.mutex.run(async () => {
+      if (this.family !== FAMILY_A) throw new Error('Réaffectation non décodée sur ce firmware');
+      return this.aSetMany(layer === 'fn' ? CMD.SET_FN_KEY : CMD.SET_KEY, encodeKeymap(slots), 0, true);
+    });
+  }
+
+  tftFactory() {
+    return this.mutex.run(async () => {
+      if (this.family !== FAMILY_A) throw new Error('Non vérifié sur ce firmware');
+      return this.aSet(CMD.SET_TFT_BUILT_IN_INDEX, [0]);
+    });
+  }
+
+  /** Envoie une animation. onProgress(fait, total). Renvoie un compte rendu. */
+  uploadTft(frames, onProgress = () => {}, slot = 1) {
+    return this.mutex.run(async () => {
+      if (!this.tft) throw new Error('Interface écran non autorisée');
+      const t0 = Date.now();
+      if (this.family === FAMILY_A) {
+        const payload = encodeAnimationA(frames);
+        const chunkPayload = this.tftReportLen - 8;
+        const total = Math.max(1, Math.ceil(payload.length / chunkPayload));
+        const isAck = (d) => d[0] === 0x55 && (d[1] === CMD.SET_LED_USER_ANIMATION || d[1] === CMD.SET_TFT_USER_ANIMATION);
+        let flow = 'probe', acked = 0;
+        for (let i = 0; i < total; i++) {
+          const report = new Uint8Array(this.tftReportLen);
+          report.set(tftChunkHeader(i, total), 0);
+          report.set(payload.slice(i * chunkPayload, (i + 1) * chunkPayload), 8);
+          this.tft.drain();
+          if (this.tft !== this.control) this.control.drain();
+          await this.tft.send(report);
+          const wait = flow === 'probe' ? 1000 : flow === 'acked' ? 1500 : 10;
+          const ack = await Promise.race([
+            this.tft.waitInput(isAck, wait),
+            this.tft !== this.control ? this.control.waitInput(isAck, wait) : new Promise(() => {}),
+          ]);
+          if (ack) acked++;
+          flow = ack && flow !== 'paced' ? 'acked' : 'paced';
+          onProgress(i + 1, total);
+        }
+        return { chunks: total, acknowledged: acked, paced: flow === 'paced', ms: Date.now() - t0 };
+      }
+      // Famille B : START(0), IMAGE_CFG(emplacement, blocs), blocs de 4096 acquittés un par un, COMMIT.
+      if (![1, 2, 3].includes(slot)) throw new Error('Emplacement 1 à 3');
+      const payload = encodeAnimationB(frames);
+      const total = payload.length / LEGACY_CHUNK;
+      await this.bStart(0);
+      try {
+        this.bAck(await this.bExchange(controlPacket(B.IMAGE_CFG, slot, total)), B.IMAGE_CFG);
+        for (let i = 0; i < total; i++) {
+          this.tft.drain();
+          await this.tft.send(payload.slice(i * LEGACY_CHUNK, (i + 1) * LEGACY_CHUNK));
+          const ack = await this.tft.waitInput(() => true, 1000);
+          if (!ack) throw new Error(`Bloc ${i + 1}/${total} non acquitté, transfert arrêté`);
+          onProgress(i + 1, total);
+        }
+        this.bAck(await this.bExchange(controlPacket(B.COMMIT, 0, 0)), B.COMMIT);
+      } catch (e) {
+        await this.bExchange(controlPacket(B.FINISH, 0, 1)).catch(() => {});
+        throw e;
+      }
+      await sleep(100);
+      return { chunks: total, acknowledged: total, paced: false, ms: Date.now() - t0 };
+    });
+  }
+}
+
+return { VENDOR_ID, PRODUCT_IDS, CONTROL_USAGE_PAGES, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, FAMILY_A, FAMILY_B, PACKET_LEN, HEADER_LEN, PAYLOAD_PER_PACKET, CMD, buildFrame, MODES, MODE_CUSTOM, DIRECTION, supportedDirections, parseHex, ledEffectPayload, parseDeviceInfo, SLEEP_A, SLEEP_B, clockPayload, LED_COUNT, encodeCustomLeds, decodeCustomLeds, KEYMAP_BYTES, PAGE, decodeKeyAction, encodeKeyAction, decodeKeymap, encodeKeymap, TFT_SIZE, FRAME_BYTES, TFT_HEADER_BYTES, rgb565, rgbaToRgb565, encodeAnimationA, tftChunkHeader, LEGACY_CHUNK, LEGACY_MAX_FRAMES, encodeAnimationB, B, controlPacket, legacyLightingPacket, legacySleepPacket, legacyClockPacket, ANSI_LED_SLOTS, legacyEncodeBank, legacyCustomModePacket, parseLegacyBattery, reportBytes, classify, sleep, Endpoint, Keyboard };
+})();
+
+// ---- layouts.js
+__mod.layouts = (() => {
+// Disposition physique de l'AK820 Pro (75 %, 81 touches).
+// Numéros d'emplacement et codes HID repris de wsclx/ak820pro-modder (MIT),
+// src/data/layouts/iso-fr.json et ansi.json. Géométrie en unités de touche (u).
+
+const NAV_X = 15.25;
+
+// [emplacement, libellé, code HID d'usine, largeur u]
+const ISO_FR = [
+  [[0, 'Échap', 41], 'gap', [1, 'F1', 58], [2, 'F2', 59], [3, 'F3', 60], [4, 'F4', 61], 'gap', [5, 'F5', 62], [6, 'F6', 63], [7, 'F7', 64], [8, 'F8', 65], 'gap', [9, 'F9', 66], [10, 'F10', 67], [11, 'F11', 68], [12, 'F12', 69], ['nav', 106, 'Suppr', 76]],
+  [[16, '²', 53], [17, '& 1', 30], [18, 'é 2', 31], [19, '" 3', 32], [20, "' 4", 33], [21, '( 5', 34], [22, '- 6', 35], [23, 'è 7', 36], [24, '_ 8', 37], [25, 'ç 9', 38], [26, 'à 0', 39], [27, ') °', 45], [28, '= +', 46], [92, 'Retour', 42, 2], ['nav', 107, 'Fin', 77]],
+  [[32, 'Tab', 43, 1.5], [33, 'A', 20], [34, 'Z', 26], [35, 'E', 8], [36, 'R', 21], [37, 'T', 23], [38, 'Y', 28], [39, 'U', 24], [40, 'I', 12], [41, 'O', 18], [42, 'P', 19], [43, '^ ¨', 47], [44, '$ £', 48], ['isoEnter', 76, 'Entrée', 40], ['nav', 105, 'Pg ↑', 75]],
+  [[48, 'Verr Maj', 57, 1.75], [49, 'Q', 4], [50, 'S', 22], [51, 'D', 7], [52, 'F', 9], [53, 'G', 10], [54, 'H', 11], [55, 'J', 13], [56, 'K', 14], [57, 'L', 15], [58, 'M', 51], [59, 'ù %', 52], [97, '* µ', 50], ['nav', 108, 'Pg ↓', 78]],
+  [[64, 'Maj', 225, 1.25], [98, '< >', 100], [65, 'W', 29], [66, 'X', 27], [67, 'C', 6], [68, 'V', 25], [69, 'B', 5], [70, 'N', 17], [71, ', ?', 16], [72, '; .', 54], [73, ': /', 55], [74, '! §', 56], [75, 'Maj', 229, 1.75], ['at', 14.25, 90, '↑', 82]],
+  [[80, 'Ctrl', 224, 1.25], [81, 'Win', 227, 1.25], [82, 'Alt', 226, 1.25], [83, '', 44, 6.25], [84, 'Alt Gr', 230], [85, 'Fn', 175], [87, 'Ctrl', 228], ['at', 13.25, 88, '←', 80], ['at', 14.25, 89, '↓', 81], ['at', 15.25, 91, '→', 79]],
+];
+
+const ANSI = [
+  ISO_FR[0].map((k) => (Array.isArray(k) && k[1] === 'Échap' ? [0, 'Esc', 41] : Array.isArray(k) && k[2] === 'Suppr' ? ['nav', 106, 'Del', 76] : k)),
+  [[16, '` ~', 53], [17, '1 !', 30], [18, '2 @', 31], [19, '3 #', 32], [20, '4 $', 33], [21, '5 %', 34], [22, '6 ^', 35], [23, '7 &', 36], [24, '8 *', 37], [25, '9 (', 38], [26, '0 )', 39], [27, '- _', 45], [28, '= +', 46], [92, 'Back', 42, 2], ['nav', 107, 'End', 77]],
+  [[32, 'Tab', 43, 1.5], [33, 'Q', 20], [34, 'W', 26], [35, 'E', 8], [36, 'R', 21], [37, 'T', 23], [38, 'Y', 28], [39, 'U', 24], [40, 'I', 12], [41, 'O', 18], [42, 'P', 19], [43, '[ {', 47], [44, '] }', 48], [97, '\\ |', 49, 1.5], ['nav', 105, 'PgUp', 75]],
+  [[48, 'Caps', 57, 1.75], [49, 'A', 4], [50, 'S', 22], [51, 'D', 7], [52, 'F', 9], [53, 'G', 10], [54, 'H', 11], [55, 'J', 13], [56, 'K', 14], [57, 'L', 15], [58, '; :', 51], [59, "' \"", 52], [76, 'Enter', 40, 2.25], ['nav', 108, 'PgDn', 78]],
+  [[64, 'Shift', 225, 2.25], [65, 'Z', 29], [66, 'X', 27], [67, 'C', 6], [68, 'V', 25], [69, 'B', 5], [70, 'N', 17], [71, 'M', 16], [72, ', <', 54], [73, '. >', 55], [74, '/ ?', 56], [75, 'Shift', 229, 1.75], ['at', 14.25, 90, '↑', 82]],
+  [[80, 'Ctrl', 224, 1.25], [81, 'Win', 227, 1.25], [82, 'Alt', 226, 1.25], [83, '', 44, 6.25], [84, 'Alt', 230], [85, 'Fn', 175], [87, 'Ctrl', 228], ['at', 13.25, 88, '←', 80], ['at', 14.25, 89, '↓', 81], ['at', 15.25, 91, '→', 79]],
+];
+
+/** Convertit les rangées en touches positionnées { slot, label, hid, x, y, w, h, iso? }. */
+function build(rows) {
+  const keys = [];
+  rows.forEach((row, y) => {
+    let x = 0;
+    for (const k of row) {
+      if (k === 'gap') { x += 0.25; continue; }
+      if (k[0] === 'nav') { keys.push({ slot: k[1], label: k[2], hid: k[3], x: NAV_X, y, w: 1, h: 1 }); continue; }
+      if (k[0] === 'at') { keys.push({ slot: k[2], label: k[3], hid: k[4], x: k[1], y, w: 1, h: 1 }); continue; }
+      if (k[0] === 'isoEnter') { keys.push({ slot: k[1], label: k[2], hid: k[3], x, y, w: 1.5, h: 2, iso: true }); x += 1.5; continue; }
+      const [slot, label, hid, w = 1] = k;
+      keys.push({ slot, label, hid, x, y, w, h: 1 });
+      x += w;
+    }
+  });
+  return keys;
+}
+
+const LAYOUTS = {
+  'iso-fr': { id: 'iso-fr', name: 'AZERTY (ISO-FR)', keys: build(ISO_FR) },
+  ansi: { id: 'ansi', name: 'QWERTY (ANSI)', keys: build(ANSI) },
+};
+const LAYOUT_WIDTH = 16.25;
+const LAYOUT_HEIGHT = 6;
+
+return { LAYOUTS, LAYOUT_WIDTH, LAYOUT_HEIGHT };
+})();
+
+// ---- keycodes.js
+__mod.keycodes = (() => {
+// Actions proposées dans la réaffectation des touches.
+
+/** Touches absentes du clavier mais utiles (codes HID, page clavier 0x07). */
+const EXTRA_KEYS = [
+  [0x46, 'Impr. écran'], [0x47, 'Arrêt défil.'], [0x48, 'Pause'], [0x49, 'Inser'], [0x4a, 'Début'],
+  [0x65, 'Menu'], [0x53, 'Verr Num'],
+  [0x68, 'F13'], [0x69, 'F14'], [0x6a, 'F15'], [0x6b, 'F16'], [0x6c, 'F17'], [0x6d, 'F18'],
+  [0x6e, 'F19'], [0x6f, 'F20'], [0x70, 'F21'], [0x71, 'F22'], [0x72, 'F23'], [0x73, 'F24'],
+  [0x54, 'Pavé /'], [0x55, 'Pavé *'], [0x56, 'Pavé -'], [0x57, 'Pavé +'], [0x58, 'Pavé Entrée'],
+  [0x59, 'Pavé 1'], [0x5a, 'Pavé 2'], [0x5b, 'Pavé 3'], [0x5c, 'Pavé 4'], [0x5d, 'Pavé 5'],
+  [0x5e, 'Pavé 6'], [0x5f, 'Pavé 7'], [0x60, 'Pavé 8'], [0x61, 'Pavé 9'], [0x62, 'Pavé 0'], [0x63, 'Pavé .'],
+];
+
+/** Touches multimédia (page Consumer 0x0C). */
+const CONSUMER = [
+  [0x00cd, 'Lecture / pause'], [0x00b5, 'Piste suivante'], [0x00b6, 'Piste précédente'], [0x00b7, 'Stop'],
+  [0x00e9, 'Volume +'], [0x00ea, 'Volume -'], [0x00e2, 'Muet'],
+  [0x006f, 'Luminosité écran +'], [0x0070, 'Luminosité écran -'],
+  [0x0192, 'Calculatrice'], [0x018a, 'Courrier'], [0x0194, 'Explorateur de fichiers'],
+  [0x0223, 'Navigateur : accueil'], [0x0221, 'Recherche'], [0x0224, 'Navigateur : précédent'], [0x0225, 'Navigateur : suivant'],
+];
+
+const MOUSE = [
+  [1, 'Clic gauche'], [2, 'Clic droit'], [4, 'Clic milieu'], [8, 'Bouton 4 (précédent)'], [16, 'Bouton 5 (suivant)'],
+];
+
+/** Libellé lisible d'une action, selon la disposition choisie. */
+function actionLabel(a, hidLabels) {
+  if (!a) return '';
+  switch (a.kind) {
+    case 'default': return 'Par défaut';
+    case 'keyboard': {
+      const extra = EXTRA_KEYS.find(([u]) => u === a.usage);
+      return hidLabels.get(a.usage) || (extra && extra[1]) || `HID 0x${a.usage.toString(16)}`;
+    }
+    case 'consumer': {
+      const c = CONSUMER.find(([u]) => u === a.value);
+      return c ? c[1] : `Média 0x${a.value.toString(16)}`;
+    }
+    case 'mouse': {
+      const m = MOUSE.find(([u]) => u === a.button);
+      return m ? m[1] : `Souris ${a.button}`;
+    }
+    default: return `Code ${a.bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ')}`;
+  }
+}
+
+function sameAction(a, b) {
+  if (!a || !b || a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case 'default': return true;
+    case 'keyboard': return a.usage === b.usage;
+    case 'consumer': return a.value === b.value;
+    case 'mouse': return a.button === b.button && (a.value ?? 0) === (b.value ?? 0);
+    default: return a.bytes.join() === b.bytes.join();
+  }
+}
+
+return { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction };
+})();
+
+// ---- image.js
+__mod.image = (() => {
+const { TFT_SIZE, rgbaToRgb565 } = __mod.protocol;
+// Préparation des images pour l'écran 128 × 128 (navigateur uniquement).
+
+/**
+ * Décode un fichier en images brutes : [{ bitmap: ImageBitmap|VideoFrame, delayMs }].
+ * GIF / WebP / PNG animés via ImageDecoder (WebCodecs, images déjà composées), sinon une seule image.
+ */
+async function decodeFile(file, maxFrames) {
+  if (file.size > 20 * 1024 * 1024) throw new Error('Fichier trop lourd (20 Mo au plus)');
+  const type = file.type || 'image/gif';
+  if ('ImageDecoder' in window && /gif|webp|png|apng/.test(type)) {
+    try {
+      const dec = new ImageDecoder({ data: await file.arrayBuffer(), type });
+      await dec.tracks.ready;
+      const count = dec.tracks.selectedTrack ? dec.tracks.selectedTrack.frameCount : 1;
+      const step = count > maxFrames ? count / maxFrames : 1;
+      const frames = [];
+      let total = 0;
+      const durations = [];
+      for (let i = 0; i < count; i++) {
+        const { image } = await dec.decode({ frameIndex: i });
+        const d = image.duration ? image.duration / 1000 : 100;
+        durations.push(d);
+        image.close();
+      }
+      // Sous-échantillonnage régulier quand l'animation dépasse la limite du clavier.
+      for (let k = 0; k < Math.min(count, maxFrames); k++) {
+        const from = Math.floor(k * step);
+        const to = Math.floor((k + 1) * step);
+        let delay = 0;
+        for (let j = from; j < Math.max(to, from + 1); j++) delay += durations[j];
+        const { image } = await dec.decode({ frameIndex: from });
+        const bitmap = await createImageBitmap(image);
+        image.close();
+        frames.push({ bitmap, delayMs: delay || 100 });
+        total += delay;
+      }
+      dec.close();
+      return { frames, sourceCount: count, totalMs: total };
+    } catch (e) {
+      if (!/png/.test(type)) throw e;
+    }
+  }
+  const bitmap = await createImageBitmap(file);
+  return { frames: [{ bitmap, delayMs: 0 }], sourceCount: 1, totalMs: 0 };
+}
+
+/**
+ * Rend une image dans un carré 128 × 128.
+ * opts = { fit: 'cover'|'contain', zoom 1-3, offsetX/offsetY -1..1, background '#rrggbb' }
+ */
+function renderFrame(bitmap, opts, canvas) {
+  const c = canvas || document.createElement('canvas');
+  c.width = TFT_SIZE;
+  c.height = TFT_SIZE;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = opts.background || '#000000';
+  ctx.fillRect(0, 0, TFT_SIZE, TFT_SIZE);
+  const bw = bitmap.width || bitmap.displayWidth;
+  const bh = bitmap.height || bitmap.displayHeight;
+  const base = opts.fit === 'contain' ? Math.min(TFT_SIZE / bw, TFT_SIZE / bh) : Math.max(TFT_SIZE / bw, TFT_SIZE / bh);
+  const s = base * (opts.zoom || 1);
+  const w = bw * s, h = bh * s;
+  const slackX = Math.max(0, w - TFT_SIZE) / 2, slackY = Math.max(0, h - TFT_SIZE) / 2;
+  const x = (TFT_SIZE - w) / 2 - (opts.offsetX || 0) * slackX;
+  const y = (TFT_SIZE - h) / 2 - (opts.offsetY || 0) * slackY;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, x, y, w, h);
+  return c;
+}
+
+/** Image rendue vers RGB565, et aperçu fidèle (couleurs quantifiées comme sur l'écran). */
+function toPixels(canvas) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const img = ctx.getImageData(0, 0, TFT_SIZE, TFT_SIZE);
+  for (let i = 0; i < img.data.length; i += 4) {
+    img.data[i] &= 0xf8;
+    img.data[i + 1] &= 0xfc;
+    img.data[i + 2] &= 0xf8;
+    img.data[i + 3] = 255;
+  }
+  return { pixels: rgbaToRgb565(img.data), preview: img };
+}
+
+return { decodeFile, renderFrame, toPixels };
+})();
+
+// ---- mock.js
+__mod.mock = (() => {
+const { VENDOR_ID, CMD, HEADER_LEN } = __mod.protocol;
+// Faux clavier pour la démo (?demo=a ou ?demo=b) et les tests Node.
+// Imite les interfaces WebHID et les réponses observées : rien n'est envoyé à un vrai appareil.
+
+class FakeDevice extends EventTarget {
+  constructor({ productId, productName, collections, onReport, onFeature, getFeature }) {
+    super();
+    Object.assign(this, { vendorId: VENDOR_ID, productId, productName, collections, opened: false });
+    this.onReport = onReport;
+    this.onFeature = onFeature;
+    this.getFeature = getFeature;
+    this.sent = [];
+  }
+  async open() { this.opened = true; }
+  async close() { this.opened = false; }
+  async sendReport(id, data) {
+    const d = new Uint8Array(data);
+    this.sent.push({ type: 'out', data: d });
+    this.onReport && this.onReport(d, this);
+  }
+  async sendFeatureReport(id, data) {
+    const d = new Uint8Array(data);
+    this.sent.push({ type: 'feature', data: d });
+    this.onFeature && this.onFeature(d, this);
+  }
+  async receiveFeatureReport() {
+    const r = this.getFeature ? this.getFeature(this) : new Uint8Array(64);
+    return new DataView(r.buffer);
+  }
+  emit(bytes) {
+    const ev = new Event('inputreport');
+    const buf = new Uint8Array(bytes);
+    ev.data = new DataView(buf.buffer);
+    ev.device = this;
+    ev.reportId = 0;
+    setTimeout(() => this.dispatchEvent(ev), 2);
+  }
+}
+
+const col = (usagePage, outBytes, featBytes = 0) => ({
+  usagePage,
+  usage: 1,
+  outputReports: outBytes ? [{ reportId: 0, items: [{ reportSize: 8, reportCount: outBytes }] }] : [],
+  featureReports: featBytes ? [{ reportId: 0, items: [{ reportSize: 8, reportCount: featBytes }] }] : [],
+  inputReports: [{ reportId: 0, items: [{ reportSize: 8, reportCount: 64 }] }],
+});
+
+/** Famille A : état conservé (effet, LED, touches) pour que la relecture soit cohérente. */
+function mockFamilyA(defaultHids) {
+  const state = {
+    keymap: new Uint8Array(512),
+    fnmap: new Uint8Array(512),
+    leds: new Uint8Array(512),
+    game: new Uint8Array(56),
+  };
+  for (const [slot, hid] of defaultHids) state.keymap.set([2, 0, hid, 0], slot * 4);
+  state.game[3] = 5;
+  state.effect = new Uint8Array([0x07, 0x8b, 0x5c, 0xff, 0xff, 0, 0, 0, 0, 4, 2, 0, 0, 0, 0xaa, 0x55]);
+  const respond = (dev, cmd, payload, addr = 0) => {
+    const r = new Uint8Array(64);
+    r[0] = 0x55; r[1] = cmd; r[3] = addr & 0xff; r[4] = addr >> 8;
+    r.set(payload.slice(0, 56), HEADER_LEN);
+    dev.emit(r);
+  };
+  const tables = {
+    [CMD.GET_KEY]: 'keymap', [CMD.SET_KEY]: 'keymap', [CMD.GET_DEFAULT_KEY_MATRIX]: 'keymapDefault',
+    [CMD.GET_FN_KEY]: 'fnmap', [CMD.SET_FN_KEY]: 'fnmap', [CMD.GET_DEFAULT_FN_KEY_MATRIX]: 'fnmap',
+    [CMD.GET_CUSTOM_LED_DATA]: 'leds', [CMD.SET_CUSTOM_LED_DATA]: 'leds',
+  };
+  state.keymapDefault = state.keymap.slice();
+  const control = new FakeDevice({
+    productId: 0x8009,
+    productName: 'AK820 Pro',
+    collections: [col(0xff68, 64)],
+    onReport(d, dev) {
+      const cmd = d[1], len = d[2], addr = d[3] | (d[4] << 8);
+      if (cmd === CMD.GET_DEVICE_INFO) {
+        const info = new Uint8Array(48);
+        info.set([0, 0, 0x00, 0x0c, 0x45, 0x0c, 0x09, 0x80, 0x07, 0x01], 0);
+        info[17] = 87; info[18] = 0; info[22] = 30;
+        return respond(dev, cmd, info);
+      }
+      if (cmd === CMD.GET_GAME_MODE) return respond(dev, cmd, state.game);
+      if (cmd === CMD.GET_LED_EFFECT) return respond(dev, cmd, state.effect);
+      if (cmd === CMD.SET_LED_EFFECT) { state.effect = d.slice(8, 24); return respond(dev, cmd, []); }
+      if (cmd === CMD.SET_GAME_MODE) { state.game.set(d.slice(8, 8 + 56)); return respond(dev, cmd, []); }
+      const t = tables[cmd];
+      if (t && cmd < 33) return respond(dev, cmd, state[t].slice(addr, addr + len), addr);
+      if (t) { state[t].set(d.slice(8, 8 + len), addr); return respond(dev, cmd, [], addr); }
+      respond(dev, cmd, []);
+    },
+  });
+  const tft = new FakeDevice({
+    productId: 0x8009,
+    productName: 'AK820 Pro',
+    collections: [col(0xff67, 4104)],
+    onReport(d, dev) {
+      const r = new Uint8Array(64); r[0] = 0x55; r[1] = CMD.SET_LED_USER_ANIMATION;
+      dev.emit(r);
+    },
+  });
+  return { devices: [control, tft], state };
+}
+
+/** Famille B : accuse réception de chaque échange feature (octet 3 = 1). */
+function mockFamilyB() {
+  let last = new Uint8Array(64);
+  const control = new FakeDevice({
+    productId: 0x800a,
+    productName: 'AK820',
+    collections: [col(0xff13, 64, 64)],
+    onFeature(d) { last = d.slice(); },
+    getFeature() {
+      const r = last.slice();
+      if (r[0] === 0x20 && r[1] === 1) { r[3] = 255; return r; }
+      if (r[0] === 4) r[3] = 1;
+      return r;
+    },
+  });
+  const tft = new FakeDevice({
+    productId: 0x800a,
+    productName: 'AK820',
+    collections: [col(0xff68, 4096)],
+    onReport(d, dev) { dev.emit(new Uint8Array(64)); },
+  });
+  return { devices: [control, tft] };
+}
+
+return { mockFamilyA, mockFamilyB };
+})();
+
+// ---- app.js
+__mod.app = (() => {
+const { VENDOR_ID, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, CONTROL_USAGE_PAGES, FAMILY_A, MODES, supportedDirections, classify, Keyboard, TFT_SIZE, LEGACY_MAX_FRAMES, parseHex, } = __mod.protocol;
+const { LAYOUTS } = __mod.layouts;
+const { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } = __mod.keycodes;
+const { decodeFile, renderFrame, toPixels } = __mod.image;
+const { mockFamilyA, mockFamilyB } = __mod.mock;
+// Interface d'AK820 Studio.
+
+
+
+
+
+// ------------------------------------------------------------ outils
+
+const $ = (s, root = document) => root.querySelector(s);
+const $$ = (s, root = document) => Array.from(root.querySelectorAll(s));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('ak820.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('ak820.' + k, JSON.stringify(v)); } catch { /* stockage indisponible */ } },
+};
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
+const ICON_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+const ICON_INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
+const PALETTE = ['#ffffff', '#ff2d2d', '#ff8a00', '#ffd500', '#2ee86b', '#00d5ff', '#2f6bff', '#8b5cff', '#ff3db8'];
+
+let toastTimer;
+function toast(msg, err = false) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('err', err);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), err ? 6000 : 2600);
+}
+
+function confirmDialog(title, text, ok = 'Continuer') {
+  const d = $('#confirm');
+  $('h2', d).textContent = title;
+  $('p', d).textContent = text;
+  $('button[value=ok]', d).textContent = ok;
+  return new Promise((resolve) => {
+    const done = (e) => { const v = e.target.value; if (!v) return; d.close(); d.removeEventListener('click', done); resolve(v === 'ok'); };
+    d.addEventListener('click', done);
+    d.showModal();
+  });
+}
+
+/** Lance une opération clavier : bouton occupé, erreurs affichées. */
+async function run(btn, fn, okMsg) {
+  if (!state.kb) { toast('Connectez d\'abord le clavier.', true); return; }
+  btn && btn.classList.add('busy');
+  try {
+    const r = await fn();
+    if (okMsg) toast(okMsg);
+    return r;
+  } catch (e) {
+    console.error(e);
+    toast(e.message || String(e), true);
+  } finally {
+    btn && btn.classList.remove('busy');
+  }
+}
+
+function seg(container, items, value, onChange) {
+  container.innerHTML = '';
+  for (const it of items) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = it.label;
+    b.dataset.v = it.value;
+    b.setAttribute('aria-pressed', String(it.value === value));
+    b.onclick = () => {
+      $$('button', container).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      onChange(it.value);
+    };
+    container.appendChild(b);
+  }
+}
+function segBind(container, value, onChange) {
+  $$('button', container).forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.v === String(value)));
+    b.onclick = () => {
+      $$('button', container).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      onChange(b.dataset.v);
+    };
+  });
+}
+
+/** Rangée de pastilles de couleur + sélecteur libre. */
+function colorRow(container, value, onChange, palette = PALETTE) {
+  container.innerHTML = '';
+  const sync = (v) => {
+    $$('.swatch', container).forEach((s) => s.setAttribute('aria-pressed', String(s.dataset.c === v)));
+    hex.textContent = v.toUpperCase();
+    input.value = v;
+  };
+  for (const c of palette) {
+    const s = document.createElement('button');
+    s.type = 'button';
+    s.className = 'swatch';
+    s.style.background = c;
+    s.dataset.c = c;
+    s.title = c;
+    s.onclick = () => { sync(c); onChange(c); };
+    container.appendChild(s);
+  }
+  const pick = document.createElement('label');
+  pick.className = 'picker';
+  pick.title = 'Autre couleur';
+  pick.innerHTML = ICON_PLUS;
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.oninput = () => { sync(input.value); onChange(input.value); };
+  pick.appendChild(input);
+  container.appendChild(pick);
+  const hex = document.createElement('span');
+  hex.className = 'hex';
+  container.appendChild(hex);
+  sync(value);
+  return sync;
+}
+
+const hexToRgb = (h) => parseHex(h) || [0, 0, 0];
+const rgbToHex = (c) => '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
+function hsv(h, s = 1, v = 1) {
+  const f = (n) => { const k = (n + h * 6) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return [f(5), f(3), f(1)].map((x) => Math.round(x * 255));
+}
+const lum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+// ------------------------------------------------------------ état
+
+const params = new URLSearchParams(location.search);
+const state = {
+  kb: null,
+  demo: params.get('demo'),
+  view: store.get('view', 'lighting'),
+  layoutId: store.get('layout', 'iso-fr'),
+  light: store.get('light', { mode: 1, color: '#8b5cff', colorMode: 0, brightness: 4, speed: 3, direction: 'left' }),
+  pk: store.get('perkey', null),
+  pkColor: store.get('pkColor', '#ff2d2d'),
+  pkBrightness: store.get('pkBrightness', 5),
+  tft: { frames: [], fileName: '', opts: store.get('tftOpts', { fit: 'cover', zoom: 1, offsetX: 0, offsetY: 0, background: '#000000', speed: 1 }), encoded: [] },
+  km: { layer: 'base', device: { base: null, fn: null }, draft: { base: null, fn: null }, selected: null },
+  logOn: false,
+  log: [],
+};
+const layout = () => LAYOUTS[state.layoutId] || LAYOUTS['iso-fr'];
+if (!state.pk || state.pk.length !== 128) state.pk = Array.from({ length: 128 }, () => [0, 0, 0]);
+
+// ------------------------------------------------------------ navigation
+
+function show(view) {
+  if (!state.kb && view !== 'welcome') view = 'welcome';
+  $$('section.view').forEach((s) => s.classList.toggle('active', s.id === 'view-' + view));
+  $$('#nav button').forEach((b) => b.setAttribute('aria-current', b.dataset.view === view ? 'page' : 'false'));
+  if (view !== 'welcome') { state.view = view; store.set('view', view); }
+  if (view === 'keymap') ensureKeymap();
+  previewLoop(view === 'lighting');
+}
+$$('#nav button').forEach((b) => (b.onclick = () => show(b.dataset.view)));
+
+// ------------------------------------------------------------ clavier dessiné
+
+function buildKb(container, onKey) {
+  container.innerHTML = '';
+  const W = 16.25, H = 6;
+  const els = new Map();
+  for (const k of layout().keys) {
+    const d = document.createElement('div');
+    d.className = 'key' + (k.iso ? ' iso' : '');
+    d.style.left = (k.x / W) * 100 + '%';
+    d.style.top = (k.y / H) * 100 + '%';
+    d.style.width = (k.w / W) * 100 + '%';
+    d.style.height = (k.h / H) * 100 + '%';
+    d.dataset.slot = k.slot;
+    d.innerHTML = '<span></span>';
+    container.appendChild(d);
+    els.set(k.slot, d);
+  }
+  if (onKey) {
+    let down = false;
+    const hit = (e) => {
+      const t = document.elementFromPoint(e.clientX, e.clientY);
+      const key = t && t.closest('.key');
+      if (key && container.contains(key)) onKey(+key.dataset.slot, e);
+    };
+    container.addEventListener('pointerdown', (e) => { down = true; hit(e); e.preventDefault(); });
+    window.addEventListener('pointermove', (e) => { if (down && container.classList.contains('paint')) hit(e); });
+    window.addEventListener('pointerup', () => { down = false; });
+  }
+  return els;
+}
+
+// ------------------------------------------------------------ éclairage
+
+const previews = [];
+function initLighting() {
+  const box = $('#effects');
+  box.innerHTML = '';
+  previews.length = 0;
+  for (const m of MODES) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'effect';
+    b.dataset.mode = m.id;
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 16;
+    b.appendChild(c);
+    b.appendChild(document.createTextNode(m.name));
+    b.onclick = () => { state.light.mode = m.id; lightingChanged(); };
+    box.appendChild(b);
+    previews.push({ mode: m.key, ctx: c.getContext('2d') });
+  }
+  const levels = [0, 1, 2, 3, 4, 5].map((v) => ({ value: v, label: String(v) }));
+  seg($('#light-brightness'), levels, state.light.brightness, (v) => { state.light.brightness = v; lightingChanged(); });
+  seg($('#light-speed'), levels, state.light.speed, (v) => { state.light.speed = v; lightingChanged(); });
+  colorRow($('#light-colors'), state.light.color, (c) => { state.light.color = c; lightingChanged(); });
+  $('#light-rainbow').checked = !!state.light.colorMode;
+  $('#light-rainbow').onchange = (e) => { state.light.colorMode = e.target.checked ? 1 : 0; lightingChanged(); };
+  $('#light-apply').onclick = (e) => applyLighting(e.currentTarget);
+  refreshLightingUi();
+}
+
+function refreshLightingUi() {
+  const L = state.light;
+  $$('#effects .effect').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.mode === L.mode)));
+  const dirs = supportedDirections(L.mode);
+  const labels = { left: 'Gauche', right: 'Droite', up: 'Haut', down: 'Bas' };
+  if (dirs.length && !dirs.includes(L.direction)) L.direction = dirs[0];
+  seg($('#light-direction'), dirs.map((d) => ({ value: d, label: labels[d] })), L.direction, (v) => { L.direction = v; lightingChanged(); });
+  $('#dir-reveal').classList.toggle('open', dirs.length > 0);
+  const live = state.kb && state.kb.caps.liveLighting;
+  $('#light-apply-row').classList.toggle('hidden', !!live);
+  $('#lighting-lead').textContent = live
+    ? 'Effet appliqué à tout le clavier. Chaque changement est envoyé aussitôt.'
+    : 'Effet appliqué à tout le clavier. Ce firmware enregistre chaque envoi dans sa mémoire flash : réglez, puis appliquez.';
+}
+
+let lightTimer;
+function lightingChanged() {
+  store.set('light', state.light);
+  refreshLightingUi();
+  if (state.kb && state.kb.caps.liveLighting) {
+    clearTimeout(lightTimer);
+    lightTimer = setTimeout(() => applyLighting(null, true), 220);
+  } else {
+    $('#light-note').textContent = state.kb ? 'Modifié, pas encore envoyé' : '';
+  }
+}
+async function applyLighting(btn, quiet) {
+  await run(btn, () => state.kb.setLighting(state.light), quiet ? null : 'Éclairage appliqué');
+  $('#light-note').textContent = '';
+}
+
+/** Aperçu approximatif de chaque effet sur une bande de 16 × 4 touches. */
+function effectColor(mode, x, y, t, base, rainbow) {
+  const col = (h) => (rainbow ? hsv(((h % 1) + 1) % 1) : base);
+  const dim = (c, k) => c.map((v) => Math.round(v * Math.max(0, Math.min(1, k))));
+  const rnd = (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };
+  const cx = x - 0.5, cy = (y - 0.5) * 0.4, r = Math.hypot(cx, cy);
+  switch (mode) {
+    case 'off': return [0, 0, 0];
+    case 'static': return col(x);
+    case 'single-on': { const p = rnd(Math.floor(x * 16), Math.floor(y * 4)); return dim(col(x), 1 - ((t * 0.7 + p * 5) % 3)); }
+    case 'single-off': { const p = rnd(Math.floor(x * 16), Math.floor(y * 4)); return dim(col(x), Math.min(1, (t * 0.7 + p * 5) % 3)); }
+    case 'glittering': { const p = rnd(Math.floor(x * 16), Math.floor(y * 4)); return dim(col(p), 0.5 + 0.5 * Math.sin(t * 4 + p * 40)); }
+    case 'falling': { const p = rnd(Math.floor(x * 16), 7); return dim(col(x), 1 - Math.abs(((t * 0.8 + p) % 1.4) - y) * 3); }
+    case 'colourful': return hsv((x + t * 0.2) % 1);
+    case 'breath': return dim(col(x), 0.5 + 0.5 * Math.sin(t * 2));
+    case 'spectrum': return rainbow ? hsv((t * 0.15) % 1) : dim(base, 0.6 + 0.4 * Math.sin(t));
+    case 'outward': return dim(col(r - t * 0.3), 0.5 + 0.5 * Math.sin(r * 18 - t * 4));
+    case 'scrolling': return dim(col(y - t * 0.3), 0.5 + 0.5 * Math.sin(y * 7 - t * 4));
+    case 'rolling': return rainbow ? hsv((x - t * 0.25 + 1) % 1) : dim(base, 0.5 + 0.5 * Math.sin(x * 9 - t * 4));
+    case 'rotating': return hsv(((Math.atan2(cy, cx) / (2 * Math.PI) + t * 0.2) % 1 + 1) % 1);
+    case 'explode': { const k = (t * 0.5) % 1; return dim(col(r), 1 - Math.abs(r - k * 0.7) * 8); }
+    case 'launch': { const k = (t * 0.6) % 1; return dim(col(x), 1 - Math.abs(1 - y - k) * 4); }
+    case 'ripples': return dim(col(r), 0.5 + 0.5 * Math.cos(r * 30 - t * 6));
+    case 'flowing': return hsv(((x + y * 0.3 - t * 0.2) % 1 + 1) % 1);
+    case 'pulsating': return dim(col(x), Math.abs(Math.sin(t * 3)));
+    case 'tilt': return dim(col(x + y), 0.5 + 0.5 * Math.sin((x + y) * 8 - t * 3));
+    case 'shuttle': { const k = 0.5 + 0.5 * Math.sin(t * 1.5); return dim(col(x), 1 - Math.abs(x - k) * 6); }
+    default: return base;
+  }
+}
+let rafId = 0;
+function previewLoop(on) {
+  cancelAnimationFrame(rafId);
+  if (!on) return;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const draw = (now) => {
+    const t = reduce ? 1 : now / 1000;
+    const base = hexToRgb(state.light.color);
+    const k = state.light.brightness / 5;
+    for (const p of previews) {
+      for (let y = 0; y < 4; y++) {
+        for (let x = 0; x < 16; x++) {
+          const c = effectColor(p.mode, x / 15, y / 3, t, base, !!state.light.colorMode).map((v) => Math.round(v * (0.25 + 0.75 * k)));
+          p.ctx.fillStyle = `rgb(${c})`;
+          p.ctx.fillRect(x * 4, y * 4, 3, 3);
+        }
+      }
+    }
+    if (!reduce) rafId = requestAnimationFrame(draw);
+  };
+  rafId = requestAnimationFrame(draw);
+}
+
+// ------------------------------------------------------------ touche par touche
+
+let pkEls;
+function initPerKey() {
+  pkEls = buildKb($('#pk-kb'), (slot) => {
+    state.pk[slot] = hexToRgb(state.pkColor);
+    paintPerKey();
+    store.set('perkey', state.pk);
+  });
+  colorRow($('#pk-colors'), state.pkColor, (c) => { state.pkColor = c; store.set('pkColor', c); }, [...PALETTE, '#000000']);
+  seg($('#pk-brightness'), [1, 2, 3, 4, 5].map((v) => ({ value: v, label: String(v) })), state.pkBrightness, (v) => { state.pkBrightness = v; store.set('pkBrightness', v); });
+  $('#pk-fill').onclick = () => { layout().keys.forEach((k) => (state.pk[k.slot] = hexToRgb(state.pkColor))); pkSave(); };
+  $('#pk-clear').onclick = () => { state.pk = state.pk.map(() => [0, 0, 0]); pkSave(); };
+  $$('[data-preset]').forEach((b) => (b.onclick = () => preset(b.dataset.preset)));
+  $('#pk-send').onclick = (e) => run(e.currentTarget, () => state.kb.setPerKey(state.pk, state.pkBrightness), 'Couleurs envoyées');
+  $('#pk-read').onclick = (e) => run(e.currentTarget, async () => { state.pk = await state.kb.getPerKey(); pkSave(); }, 'Couleurs lues');
+  paintPerKey();
+}
+function pkSave() { paintPerKey(); store.set('perkey', state.pk); }
+function preset(name) {
+  const keys = layout().keys;
+  if (name === 'rainbow') keys.forEach((k) => (state.pk[k.slot] = hsv((k.x + k.w / 2) / 16.25 * 0.85)));
+  if (name === 'rows') keys.forEach((k) => (state.pk[k.slot] = hsv(k.y / 6 * 0.8 + 0.5)));
+  if (name === 'gaming') {
+    const hot = state.layoutId === 'iso-fr' ? [34, 49, 50, 51] : [34, 49, 50, 51]; // mêmes emplacements physiques (Z/W, Q/A, S, D)
+    const arrows = [90, 88, 89, 91];
+    keys.forEach((k) => (state.pk[k.slot] = [20, 20, 40]));
+    [...hot, ...arrows].forEach((s) => (state.pk[s] = [255, 40, 40]));
+    [80, 64, 83, 32].forEach((s) => (state.pk[s] = [255, 140, 0]));
+  }
+  pkSave();
+}
+function paintPerKey() {
+  if (!pkEls) return;
+  const b = state.kb && state.kb.family !== FAMILY_A;
+  for (const k of layout().keys) {
+    const el = pkEls.get(k.slot);
+    const c = state.pk[k.slot] || [0, 0, 0];
+    const span = el.firstChild;
+    span.textContent = k.label;
+    const off = c[0] + c[1] + c[2] === 0;
+    span.style.background = off ? '' : rgbToHex(c);
+    span.style.color = off ? '' : lum(c) > 140 ? '#111' : '#fff';
+    span.style.borderColor = off ? '' : 'transparent';
+    el.classList.toggle('na', b && k.slot === 98);
+  }
+}
+
+// ------------------------------------------------------------ écran
+
+const tftCanvas = $('#tft-preview');
+let tftPlay = 0;
+function initScreen() {
+  const drop = $('#drop'), input = $('#tft-file');
+  input.onchange = () => input.files[0] && loadImage(input.files[0]);
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); e.dataTransfer.files[0] && loadImage(e.dataTransfer.files[0]); });
+  const o = state.tft.opts;
+  segBind($('#tft-fit'), o.fit, (v) => { o.fit = v; tftChanged(); });
+  segBind($('#tft-speed'), String(o.speed), (v) => { o.speed = +v; tftChanged(); });
+  for (const [id, k] of [['#tft-zoom', 'zoom'], ['#tft-x', 'offsetX'], ['#tft-y', 'offsetY']]) {
+    $(id).value = o[k];
+    $(id).oninput = (e) => { o[k] = +e.target.value; tftChanged(); };
+  }
+  colorRow($('#tft-bg'), o.background, (c) => { o.background = c; tftChanged(); }, ['#000000', '#ffffff', '#1a1a2e', '#5b4cdb']);
+  $('#tft-send').onclick = (e) => sendScreen(e.currentTarget);
+  $('#tft-clock').onclick = (e) => run(e.currentTarget, () => state.kb.syncClock(new Date()), 'Horloge réglée sur ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+  $('#tft-factory').onclick = (e) => run(e.currentTarget, () => state.kb.tftFactory(), 'Animation d\'origine rétablie');
+  const ctx = tftCanvas.getContext('2d');
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, TFT_SIZE, TFT_SIZE);
+}
+function maxFrames() {
+  if (state.kb && state.kb.family !== FAMILY_A) return LEGACY_MAX_FRAMES;
+  return Math.min(255, (state.info && state.info.tftMaxFrames) || 30);
+}
+async function loadImage(file) {
+  try {
+    const { frames, sourceCount } = await decodeFile(file, maxFrames());
+    state.tft.frames.forEach((f) => f.bitmap.close && f.bitmap.close());
+    state.tft.frames = frames;
+    state.tft.sourceCount = sourceCount;
+    state.tft.fileName = file.name;
+    $('#tft-opts').classList.remove('hidden');
+    tftChanged();
+  } catch (e) {
+    toast('Image illisible : ' + (e.message || e), true);
+  }
+}
+function tftChanged() {
+  store.set('tftOpts', state.tft.opts);
+  const { frames, opts } = state.tft;
+  if (!frames.length) return;
+  const work = document.createElement('canvas');
+  state.tft.encoded = frames.map((f) => {
+    renderFrame(f.bitmap, opts, work);
+    const { pixels, preview } = toPixels(work);
+    return { pixels, preview, delayMs: Math.max(frames.length > 1 ? 20 : 0, Math.round(f.delayMs / opts.speed)) };
+  });
+  const n = frames.length, total = state.tft.encoded.reduce((a, f) => a + f.delayMs, 0);
+  const cut = state.tft.sourceCount > n ? ` (sur ${state.tft.sourceCount}, limite du clavier)` : '';
+  $('#tft-meta').textContent = n > 1 ? `${n} images${cut}, ${(total / 1000).toFixed(1).replace('.', ',')} s` : 'Image fixe';
+  $('#tft-send').disabled = !state.kb;
+  $('#tft-speed').closest('.field').classList.toggle('hidden', n < 2);
+  playPreview();
+}
+function playPreview() {
+  clearTimeout(tftPlay);
+  const enc = state.tft.encoded;
+  const ctx = tftCanvas.getContext('2d');
+  let i = 0;
+  const step = () => {
+    ctx.putImageData(enc[i].preview, 0, 0);
+    if (enc.length > 1) { const d = enc[i].delayMs || 100; i = (i + 1) % enc.length; tftPlay = setTimeout(step, d); }
+  };
+  if (enc.length) step();
+}
+async function sendScreen(btn) {
+  const enc = state.tft.encoded;
+  if (!enc.length) return;
+  if (state.kb && state.kb.family !== FAMILY_A) {
+    const ok = await confirmDialog('Remplacer l\'animation ?', 'Ce firmware efface l\'animation enregistrée avant de recevoir la nouvelle. Si le transfert est interrompu, il faudra le relancer.', 'Remplacer');
+    if (!ok) return;
+  }
+  const bar = $('#tft-progress');
+  bar.classList.remove('hidden');
+  bar.firstElementChild.style.width = '0';
+  const rep = await run(btn, () => state.kb.uploadTft(enc.map((f) => ({ pixels: f.pixels, delayMs: f.delayMs })), (d, t) => { bar.firstElementChild.style.width = (d / t) * 100 + '%'; }));
+  setTimeout(() => bar.classList.add('hidden'), 800);
+  if (rep) {
+    const s = (rep.ms / 1000).toFixed(1).replace('.', ',');
+    toast(rep.paced ? `Envoyé en ${s} s (${rep.acknowledged}/${rep.chunks} blocs confirmés). Si rien ne s'affiche : Fn + Suppr.` : `Image envoyée en ${s} s`);
+    logLine(`écran : ${rep.chunks} blocs, ${rep.acknowledged} acquittés, ${rep.paced ? 'cadencé' : 'acquitté'}, ${rep.ms} ms`);
+  }
+}
+
+// ------------------------------------------------------------ touches
+
+let kmEls;
+function hidLabels() {
+  const m = new Map();
+  for (const k of layout().keys) if (k.label && !m.has(k.hid)) m.set(k.hid, k.label.replace(/\n/g, ' '));
+  m.set(44, 'Espace');
+  return m;
+}
+function initKeymap() {
+  kmEls = buildKb($('#km-kb'), (slot) => { state.km.selected = slot; renderKeymap(); renderPicker(); });
+  segBind($('#km-layer'), state.km.layer, (v) => { state.km.layer = v; state.km.selected = null; ensureKeymap(); renderKeymap(); renderPicker(); });
+  $('#km-search').oninput = renderPicker;
+  $('#km-revert').onclick = () => { const L = state.km.layer; state.km.draft[L] = state.km.device[L].map((a) => ({ ...a })); renderKeymap(); renderPicker(); };
+  $('#km-factory').onclick = (e) => run(e.currentTarget, async () => {
+    state.km.draft[state.km.layer] = await state.kb.getKeymap(state.km.layer, true);
+    renderKeymap(); renderPicker();
+  }, 'Valeurs d\'usine chargées : vérifiez puis écrivez sur le clavier');
+  $('#km-write').onclick = (e) => run(e.currentTarget, async () => {
+    const L = state.km.layer;
+    await state.kb.setKeymap(L, state.km.draft[L]);
+    state.km.device[L] = await state.kb.getKeymap(L);
+    state.km.draft[L] = state.km.device[L].map((a) => ({ ...a }));
+    renderKeymap();
+  }, 'Touches enregistrées sur le clavier');
+}
+async function ensureKeymap() {
+  if (!state.kb || !state.kb.caps.keymap) return;
+  const L = state.km.layer;
+  if (state.km.device[L]) return renderKeymap();
+  await run(null, async () => {
+    state.km.device[L] = await state.kb.getKeymap(L);
+    state.km.draft[L] = state.km.device[L].map((a) => ({ ...a }));
+  });
+  renderKeymap();
+}
+function renderKeymap() {
+  if (!kmEls) return;
+  const L = state.km.layer, draft = state.km.draft[L], dev = state.km.device[L];
+  const labels = hidLabels();
+  let changed = 0;
+  for (const k of layout().keys) {
+    const el = kmEls.get(k.slot);
+    const a = draft && draft[k.slot];
+    const isDefault = !a || a.kind === 'default' || (a.kind === 'keyboard' && a.usage === k.hid);
+    const diff = draft && dev && !sameAction(a, dev[k.slot]);
+    if (diff) changed++;
+    el.firstChild.textContent = isDefault ? k.label : actionLabel(a, labels);
+    el.classList.toggle('mod', !isDefault);
+    el.classList.toggle('sel', state.km.selected === k.slot);
+  }
+  $('#km-count').textContent = changed ? `${changed} modification${changed > 1 ? 's' : ''} à écrire` : '';
+  $('#km-write').disabled = !changed;
+  $('#km-revert').disabled = !changed;
+}
+function renderPicker() {
+  const box = $('#km-actions');
+  const slot = state.km.selected;
+  const L = state.km.layer;
+  const key = layout().keys.find((k) => k.slot === slot);
+  $('#km-search').disabled = !key;
+  if (!key || !state.km.draft[L]) { box.innerHTML = ''; $('#km-title').textContent = 'Aucune touche choisie'; return; }
+  $('#km-title').textContent = `Touche « ${key.label || 'Espace'} »${L === 'fn' ? ' avec Fn' : ''}`;
+  const q = $('#km-search').value.trim().toLowerCase();
+  const cur = state.km.draft[L][slot];
+  const labels = hidLabels();
+  const groups = [
+    ['Origine', [[{ kind: 'keyboard', usage: key.hid }, `${key.label || 'Espace'} (origine)`]]],
+    ['Touches du clavier', [...labels].map(([u, l]) => [{ kind: 'keyboard', usage: u }, l])],
+    ['Autres touches', EXTRA_KEYS.map(([u, l]) => [{ kind: 'keyboard', usage: u }, l])],
+    ['Multimédia', CONSUMER.map(([v, l]) => [{ kind: 'consumer', value: v }, l])],
+    ['Souris', MOUSE.map(([b, l]) => [{ kind: 'mouse', button: b, value: 0 }, l])],
+  ];
+  box.innerHTML = '';
+  for (const [title, items] of groups) {
+    const shown = items.filter(([, l]) => !q || l.toLowerCase().includes(q));
+    if (!shown.length) continue;
+    const h = document.createElement('h3'); h.textContent = title; box.appendChild(h);
+    const list = document.createElement('div'); list.className = 'list';
+    for (const [action, label] of shown) {
+      const c = document.createElement('button');
+      c.type = 'button'; c.className = 'chip'; c.textContent = label;
+      c.setAttribute('aria-pressed', String(sameAction(action, cur)));
+      c.onclick = () => { state.km.draft[L][slot] = action; renderKeymap(); renderPicker(); };
+      list.appendChild(c);
+    }
+    box.appendChild(list);
+  }
+}
+
+// ------------------------------------------------------------ système
+
+function initSystem() {
+  const sel = $('#sys-layout');
+  sel.innerHTML = Object.values(LAYOUTS).map((l) => `<option value="${l.id}">${l.name}</option>`).join('');
+  sel.value = state.layoutId;
+  sel.onchange = () => {
+    state.layoutId = sel.value; store.set('layout', sel.value);
+    initPerKey(); initKeymap(); renderKeymap(); renderPicker();
+  };
+  $('#sys-refresh').onclick = (e) => run(e.currentTarget, loadInfo);
+  $('#sys-log-on').onchange = (e) => { state.logOn = e.target.checked; $('#sys-log').classList.toggle('hidden', !state.logOn); };
+  $('#sys-log-copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(state.log.join('\n')); toast(`${state.log.length} lignes copiées`); }
+    catch { toast('Copie refusée par le navigateur', true); }
+  };
+  $('#sys-export').onclick = () => {
+    const data = { app: 'ak820-studio', version: 1, light: state.light, perKey: state.pk, perKeyBrightness: state.pkBrightness, layout: state.layoutId, keymap: state.km.draft };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
+    a.download = 'ak820-reglages.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $('#sys-import').onchange = async (e) => {
+    try {
+      const d = JSON.parse(await e.target.files[0].text());
+      if (d.app !== 'ak820-studio') throw new Error('fichier inconnu');
+      if (d.light) { state.light = d.light; store.set('light', d.light); }
+      if (d.perKey && d.perKey.length === 128) { state.pk = d.perKey; store.set('perkey', d.perKey); }
+      if (d.perKeyBrightness) state.pkBrightness = d.perKeyBrightness;
+      if (d.keymap && state.km.device.base) for (const L of ['base', 'fn']) if (d.keymap[L]) state.km.draft[L] = d.keymap[L];
+      initLighting(); paintPerKey(); renderKeymap();
+      toast('Réglages importés. Envoyez-les au clavier depuis chaque section.');
+    } catch (err) { toast('Import impossible : ' + err.message, true); }
+    e.target.value = '';
+  };
+}
+
+async function loadInfo() {
+  const kb = state.kb;
+  const info = await kb.info().catch((e) => ({ error: e.message }));
+  state.info = info;
+  const rows = [['Modèle', kb.name], ['Identifiant USB', `${VENDOR_ID.toString(16).padStart(4, '0')}:${kb.pid.toString(16).padStart(4, '0')}`],
+    ['Firmware', kb.family === FAMILY_A ? `famille A (0xFF68)${info.firmware ? ', version ' + info.firmware : ''}` : 'famille B (0xFF13)']];
+  if (info.error) rows.push(['Lecture', info.error]);
+  if (info.batteryLevel !== undefined && info.batteryLevel !== null) rows.push(['Batterie', `${info.batteryLevel} %${info.chargeStatus ? ', en charge' : ''}`]);
+  else if (info.wiredFull) rows.push(['Batterie', 'pleine ou alimenté par câble']);
+  rows.push(['Écran', kb.tft ? 'accessible' : 'interface non autorisée']);
+  if (info.tftMaxFrames) rows.push(['Images par animation', String(info.tftMaxFrames)]);
+  $('#sys-info').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${String(v).replace(/</g, '&lt;')}</dd>`).join('');
+
+  const opts = kb.caps.sleep;
+  const cur = await kb.getSleep().catch(() => null);
+  seg($('#sys-sleep'), opts, cur ?? -1, (v) => run(null, () => kb.setSleep(v), 'Mise en veille réglée'));
+}
+
+function logLine(s) {
+  state.log.push(s);
+  if (state.log.length > 2000) state.log.shift();
+  if (state.logOn) {
+    const el = $('#sys-log');
+    el.textContent = state.log.slice(-300).join('\n');
+    el.scrollTop = el.scrollHeight;
+  }
+}
+function hexLog(dir, bytes, ep) {
+  const n = dir.startsWith('tx') ? 24 : 24;
+  const hex = Array.from(bytes.slice(0, n), (b) => b.toString(16).padStart(2, '0')).join(' ');
+  const t = new Date().toLocaleTimeString('fr-FR', { hour12: false }) + '.' + String(Date.now() % 1000).padStart(3, '0');
+  logLine(`${t} ${ep || ''} ${dir.padEnd(3)} [${bytes.length}] ${hex}${bytes.length > n ? ' …' : ''}`);
+}
+
+// ------------------------------------------------------------ connexion
+
+const FILTERS = [...CONTROL_USAGE_PAGES.slice(0, 1), PAGE_TFT_A, PAGE_FEATURE].map((usagePage) => ({ vendorId: VENDOR_ID, usagePage }));
+
+async function grantedDevices() {
+  if (state.demo) return null;
+  return (await navigator.hid.getDevices()).filter((d) => d.vendorId === VENDOR_ID);
+}
+
+async function connect(devices) {
+  const cls = classify(devices);
+  if (cls.error) { toast(cls.error, true); return false; }
+  if (state.kb) await state.kb.close();
+  const kb = new Keyboard(cls, (dir, bytes, ep) => hexLog(dir, bytes, ep));
+  try { await kb.open(); }
+  catch (e) {
+    toast('Le clavier refuse la connexion : fermez le logiciel Ajazz ou un autre onglet qui l\'utilise. (' + e.message + ')', true);
+    return false;
+  }
+  state.kb = kb;
+  state.km = { layer: state.km.layer, device: { base: null, fn: null }, draft: { base: null, fn: null }, selected: null };
+  onConnected();
+  return true;
+}
+
+async function onConnected() {
+  const kb = state.kb;
+  const st = $('#status');
+  st.classList.add('on');
+  $('span', st).textContent = `${kb.name}${state.demo ? ' (démo)' : ''}`;
+  $('#connect span').textContent = 'Changer';
+  $$('#nav button').forEach((b) => (b.disabled = false));
+  $('#keymap-unsupported').classList.toggle('hidden', kb.caps.keymap);
+  $('#keymap-body').classList.toggle('hidden', !kb.caps.keymap);
+  $('#tft-factory').classList.toggle('hidden', !kb.caps.tftBuiltIn);
+  $('#pk-read').classList.toggle('hidden', kb.family !== FAMILY_A);
+  $('#pk-iso-note').classList.toggle('hidden', kb.family === FAMILY_A || state.layoutId === 'ansi');
+  const banner = $('#banner');
+  banner.innerHTML = '';
+  if (state.demo) banner.innerHTML = `<div class="banner">${ICON_INFO}<span>Mode démo : un faux clavier (famille ${kb.family}) répond aux commandes. <a href="?">Quitter la démo</a></span></div>`;
+  else if (!kb.tft) {
+    banner.innerHTML = `<div class="banner warn">${ICON_INFO}<span>L'interface de l'écran n'a pas été autorisée. <button class="btn" id="grant-tft" style="margin-left:8px">Autoriser l'écran</button></span></div>`;
+    $('#grant-tft').onclick = async () => {
+      const extra = await navigator.hid.requestDevice({ filters: [PAGE_TFT_A, PAGE_TFT_B].map((usagePage) => ({ vendorId: VENDOR_ID, usagePage })) });
+      if (extra.length) await connect([...(await grantedDevices()), ...extra]);
+    };
+  }
+  show(state.view);
+  refreshLightingUi();
+  paintPerKey();
+  if (state.tft.encoded.length) $('#tft-send').disabled = false;
+  await loadInfo();
+  const cur = await kb.getLighting();
+  if (cur && MODES.some((m) => m.id === cur.mode)) { state.light = { ...state.light, ...cur }; initLighting(); }
+}
+
+function onDisconnected() {
+  state.kb = null;
+  const st = $('#status');
+  st.classList.remove('on');
+  $('span', st).textContent = 'Non connecté';
+  $('#connect span').textContent = 'Connecter';
+  $('#tft-send').disabled = true;
+  show('welcome');
+}
+
+async function requestConnect() {
+  if (state.demo) return;
+  if (!('hid' in navigator)) { toast('Ce navigateur ne permet pas l\'accès USB : utilisez Chrome ou Edge.', true); return; }
+  try {
+    const picked = await navigator.hid.requestDevice({ filters: FILTERS });
+    if (!picked.length) return;
+    // Le sélecteur peut ne rendre qu'une interface : on y ajoute les autres déjà autorisées.
+    const all = await grantedDevices();
+    const same = all.filter((d) => d.productId === picked[0].productId);
+    await connect([...new Set([...picked, ...same])]);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ------------------------------------------------------------ démarrage
+
+function boot() {
+  initLighting();
+  initPerKey();
+  initScreen();
+  initKeymap();
+  initSystem();
+  $('#connect').onclick = requestConnect;
+  $('#welcome-connect').onclick = requestConnect;
+  $$('#nav button').forEach((b) => (b.disabled = true));
+
+  if (state.demo) {
+    const devs = state.demo === 'b' ? mockFamilyB().devices : mockFamilyA(LAYOUTS['iso-fr'].keys.map((k) => [k.slot, k.hid])).devices;
+    connect(devs);
+    return;
+  }
+  show('welcome');
+  if (!('hid' in navigator)) {
+    const n = $('#no-webhid');
+    n.classList.remove('hidden');
+    n.textContent = window.isSecureContext
+      ? 'Ce navigateur ne gère pas l\'USB (WebHID). Ouvrez cette page dans Chrome ou Edge sur ordinateur.'
+      : 'Accès USB indisponible sur une adresse http:// du réseau. Ouvrez le fichier téléchargé (ak820-studio.html) directement dans Chrome ou Edge, ou une adresse https://.';
+    $('#welcome-connect').disabled = true;
+    $('#connect').disabled = true;
+    return;
+  }
+  navigator.hid.addEventListener('disconnect', (e) => {
+    if (state.kb && (e.device === state.kb.control.device || (state.kb.tft && e.device === state.kb.tft.device))) {
+      onDisconnected();
+      toast('Clavier débranché');
+    }
+  });
+  navigator.hid.addEventListener('connect', async () => { if (!state.kb) tryAuto(); });
+  tryAuto();
+}
+
+async function tryAuto() {
+  const devs = await grantedDevices();
+  if (devs && devs.length && classify(devs).family) connect(devs);
+}
+
+boot();
+
+return {  };
+})();
+</script>
+</body>
+</html>
