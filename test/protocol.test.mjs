@@ -217,6 +217,41 @@ test('famille B : START, préambule, données, COMMIT, FINISH', async () => {
   assert.deepEqual(ctl, [[0x18, 0, 0], [0x72, 1, 9], [0x02, 0, 0]]);
 });
 
+test('famille B : table des touches (pilote Windows 1.0.0.5)', async () => {
+  const slots = P.defaultKeymap();
+  slots[48] = { kind: 'keyboard', usage: 0x29 };   // Verr Maj → Échap (index 55)
+  slots[87] = { kind: 'keyboard', usage: 0xe3 };   // Ctrl droit → Win gauche : masque 0x08 (index 98)
+  slots[1] = { kind: 'consumer', value: 0x00cd };  // F1 → lecture/pause (index 2)
+  slots[12] = { kind: 'mouse', button: 4, value: 0 }; // F12 → clic milieu (index 13)
+  slots[98] = { kind: 'keyboard', usage: 0x04 };   // « < > » ISO : pas d'index connu, ignorée
+  const t = P.legacyEncodeKeymap(slots);
+  assert.equal(t.length, 576);
+  assert.deepEqual(arr(t, 55 * 4, 56 * 4), [2, 0, 0x29, 0]);
+  assert.deepEqual(arr(t, 98 * 4, 99 * 4), [2, 0x08, 0, 0]);
+  assert.deepEqual(arr(t, 2 * 4, 3 * 4), [3, 0xcd, 0, 0]);
+  assert.deepEqual(arr(t, 13 * 4, 14 * 4), [1, 1, 4, 0]);
+  assert.deepEqual(arr(t, 574, 576), [0xaa, 0x55]);
+  const nonZero = [];
+  for (let i = 0; i < 143; i++) if (t.slice(i * 4, i * 4 + 4).some((b) => b)) nonZero.push(i);
+  assert.deepEqual(nonZero, [2, 13, 55, 98, 143].filter((i) => i < 143), 'le reste à 0 = comportement d\'origine');
+
+  const { devices } = mockFamilyB();
+  const kb = new P.Keyboard(P.classify(devices));
+  await kb.open();
+  await kb.setKeymap('fn', slots);
+  const s = devices[0].sent.map((x) => x.data);
+  assert.equal(s.length, 13);
+  assert.deepEqual([s[0][1], s[0][8]], [0x18, 0]);
+  assert.deepEqual([s[1][0], s[1][1], s[1][8]], [4, 0x27, 9]);
+  assert.deepEqual(Array.from(s.slice(2, 11).flatMap((b) => Array.from(b))), Array.from(t));
+  assert.deepEqual([s[11][1], s[12][1], s[12][8]], [0x02, 0xf0, 0]);
+  devices[0].sent.length = 0;
+  await kb.setKeymap('base', slots);
+  assert.equal(devices[0].sent[1].data[1], 0x11);
+  assert.equal((await kb.getKeymap('base', true)).every((a) => a.kind === 'default'), true);
+  await assert.rejects(kb.getKeymap('base'));
+});
+
 test('famille B : FINISH envoyé même après un refus', async () => {
   const { devices } = mockFamilyB();
   const orig = devices[0].getFeature;

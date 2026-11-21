@@ -291,7 +291,7 @@ export function encodeAnimationB(frames) {
 
 // ---------------------------------------------------------------- famille B
 
-export const B = { START: 0x18, COMMIT: 0x02, FINISH: 0xf0, LIGHTING: 0x13, CUSTOM_BANK: 0x23, SLEEP: 0x17, CLOCK: 0x28, IMAGE_CFG: 0x72 };
+export const B = { START: 0x18, COMMIT: 0x02, FINISH: 0xf0, LIGHTING: 0x13, CUSTOM_BANK: 0x23, SLEEP: 0x17, CLOCK: 0x28, IMAGE_CFG: 0x72, KEYMAP: 0x11, KEYMAP_FN: 0x27 };
 
 export function controlPacket(command, sub, value) {
   const p = new Uint8Array(64);
@@ -363,6 +363,32 @@ export function legacyEncodeBank(colors) {
   data[574] = 0xaa; data[575] = 0x55;
   return data;
 }
+
+/**
+ * Action d'une touche, famille B (pilote Windows 1.0.0.5, fonction 0x418420) :
+ * 0 = comportement d'origine ; [02, masque, hid, 00] clavier (Ctrl/Maj/Alt/Win E0-E7 en masque 1<<n) ;
+ * [03, lo, hi, 00] multimédia ; [01, 01, masque, 00] boutons souris ; [06, macro, …] macro.
+ */
+export function encodeKeyActionB(a) {
+  if (!a || a.kind === 'default') return [0, 0, 0, 0];
+  if (a.kind === 'keyboard') {
+    if (a.usage >= 0xe0 && a.usage <= 0xe7) return [2, 1 << (a.usage - 0xe0), 0, 0];
+    return [2, 0, a.usage & 0xff, 0];
+  }
+  if (a.kind === 'consumer') return [3, a.value & 0xff, (a.value >> 8) & 0xff, 0];
+  if (a.kind === 'mouse') return [1, 1, a.button & 0xff, 0];
+  return a.bytes.slice(0, 4);
+}
+
+/** Table des touches famille B : 576 octets, 4 par index de touche (= index LED), fin AA 55. */
+export function legacyEncodeKeymap(slots) {
+  const data = new Uint8Array(576);
+  for (const [slot, id] of ANSI_LED_SLOTS) data.set(encodeKeyActionB(slots[slot]), id * 4);
+  data[574] = 0xaa; data[575] = 0x55;
+  return data;
+}
+export const LEGACY_KEY_SLOTS = new Set(ANSI_LED_SLOTS.map(([s]) => s));
+export const defaultKeymap = () => Array.from({ length: 128 }, () => ({ kind: 'default' }));
 
 export function legacyCustomModePacket(brightness) {
   const p = new Uint8Array(64);
@@ -517,7 +543,7 @@ export class Keyboard {
 
   get caps() {
     const a = this.family === FAMILY_A;
-    return { info: a, keymap: a, perKey: true, perKeyIsoComplete: a, tft: !!this.tft, tftBuiltIn: a, liveLighting: a, secondary: a, sleep: a ? SLEEP_A : SLEEP_B };
+    return { info: a, keymap: true, keymapRead: a, perKey: true, perKeyIsoComplete: a, tft: !!this.tft, tftBuiltIn: a, liveLighting: a, secondary: a, sleep: a ? SLEEP_A : SLEEP_B };
   }
 
   // ---- famille A : primitives
@@ -683,9 +709,13 @@ export class Keyboard {
     });
   }
 
+  /** Famille B : aucune relecture connue ; les valeurs d'usine sont « tout à 0 ». */
   getKeymap(layer = 'base', factory = false) {
     return this.mutex.run(async () => {
-      if (this.family !== FAMILY_A) throw new Error('Réaffectation non décodée sur ce firmware');
+      if (this.family !== FAMILY_A) {
+        if (factory) return defaultKeymap();
+        throw new Error('Ce firmware ne permet pas de relire les touches');
+      }
       const cmd = layer === 'fn'
         ? (factory ? CMD.GET_DEFAULT_FN_KEY_MATRIX : CMD.GET_FN_KEY)
         : (factory ? CMD.GET_DEFAULT_KEY_MATRIX : CMD.GET_KEY);
@@ -695,7 +725,12 @@ export class Keyboard {
 
   setKeymap(layer, slots) {
     return this.mutex.run(async () => {
-      if (this.family !== FAMILY_A) throw new Error('Réaffectation non décodée sur ce firmware');
+      if (this.family !== FAMILY_A) {
+        const table = legacyEncodeKeymap(slots);
+        const blocks = [];
+        for (let i = 0; i < 9; i++) blocks.push(table.slice(i * 64, i * 64 + 64));
+        return this.bTransaction(0, controlPacket(layer === 'fn' ? B.KEYMAP_FN : B.KEYMAP, 0, 9), blocks);
+      }
       return this.aSetMany(layer === 'fn' ? CMD.SET_FN_KEY : CMD.SET_KEY, encodeKeymap(slots), 0, true);
     });
   }

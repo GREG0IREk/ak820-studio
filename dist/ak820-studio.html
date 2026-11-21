@@ -388,7 +388,7 @@ dialog p { color: var(--muted); margin: 0 0 18px; }
     <section class="view" id="view-keymap">
       <h1>Touches</h1>
       <p class="lead">Choisissez une touche, puis l'action qu'elle doit envoyer. Les changements restent sur le clavier, quel que soit l'ordinateur.</p>
-      <div id="keymap-unsupported" class="banner warn hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>La réaffectation n'est pas décodée pour le firmware de ce clavier (interface 0xFF13). Éclairage, couleurs par touche, écran et veille fonctionnent.</span></div>
+      <div id="keymap-unsupported" class="banner hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>Ce firmware ne permet pas de relire les touches : la page affiche ce qui a été écrit depuis ce navigateur. « Valeurs d'usine » puis « Écrire » remet tout le clavier d'origine. La touche « &lt; &gt; » n'est pas réaffectable.</span></div>
       <div class="km-grid" id="keymap-body">
         <div class="card">
           <div class="row" style="justify-content: space-between; margin-bottom: 14px;">
@@ -758,7 +758,7 @@ function encodeAnimationB(frames) {
 
 // ---------------------------------------------------------------- famille B
 
-const B = { START: 0x18, COMMIT: 0x02, FINISH: 0xf0, LIGHTING: 0x13, CUSTOM_BANK: 0x23, SLEEP: 0x17, CLOCK: 0x28, IMAGE_CFG: 0x72 };
+const B = { START: 0x18, COMMIT: 0x02, FINISH: 0xf0, LIGHTING: 0x13, CUSTOM_BANK: 0x23, SLEEP: 0x17, CLOCK: 0x28, IMAGE_CFG: 0x72, KEYMAP: 0x11, KEYMAP_FN: 0x27 };
 
 function controlPacket(command, sub, value) {
   const p = new Uint8Array(64);
@@ -830,6 +830,32 @@ function legacyEncodeBank(colors) {
   data[574] = 0xaa; data[575] = 0x55;
   return data;
 }
+
+/**
+ * Action d'une touche, famille B (pilote Windows 1.0.0.5, fonction 0x418420) :
+ * 0 = comportement d'origine ; [02, masque, hid, 00] clavier (Ctrl/Maj/Alt/Win E0-E7 en masque 1<<n) ;
+ * [03, lo, hi, 00] multimédia ; [01, 01, masque, 00] boutons souris ; [06, macro, …] macro.
+ */
+function encodeKeyActionB(a) {
+  if (!a || a.kind === 'default') return [0, 0, 0, 0];
+  if (a.kind === 'keyboard') {
+    if (a.usage >= 0xe0 && a.usage <= 0xe7) return [2, 1 << (a.usage - 0xe0), 0, 0];
+    return [2, 0, a.usage & 0xff, 0];
+  }
+  if (a.kind === 'consumer') return [3, a.value & 0xff, (a.value >> 8) & 0xff, 0];
+  if (a.kind === 'mouse') return [1, 1, a.button & 0xff, 0];
+  return a.bytes.slice(0, 4);
+}
+
+/** Table des touches famille B : 576 octets, 4 par index de touche (= index LED), fin AA 55. */
+function legacyEncodeKeymap(slots) {
+  const data = new Uint8Array(576);
+  for (const [slot, id] of ANSI_LED_SLOTS) data.set(encodeKeyActionB(slots[slot]), id * 4);
+  data[574] = 0xaa; data[575] = 0x55;
+  return data;
+}
+const LEGACY_KEY_SLOTS = new Set(ANSI_LED_SLOTS.map(([s]) => s));
+const defaultKeymap = () => Array.from({ length: 128 }, () => ({ kind: 'default' }));
 
 function legacyCustomModePacket(brightness) {
   const p = new Uint8Array(64);
@@ -984,7 +1010,7 @@ class Keyboard {
 
   get caps() {
     const a = this.family === FAMILY_A;
-    return { info: a, keymap: a, perKey: true, perKeyIsoComplete: a, tft: !!this.tft, tftBuiltIn: a, liveLighting: a, secondary: a, sleep: a ? SLEEP_A : SLEEP_B };
+    return { info: a, keymap: true, keymapRead: a, perKey: true, perKeyIsoComplete: a, tft: !!this.tft, tftBuiltIn: a, liveLighting: a, secondary: a, sleep: a ? SLEEP_A : SLEEP_B };
   }
 
   // ---- famille A : primitives
@@ -1150,9 +1176,13 @@ class Keyboard {
     });
   }
 
+  /** Famille B : aucune relecture connue ; les valeurs d'usine sont « tout à 0 ». */
   getKeymap(layer = 'base', factory = false) {
     return this.mutex.run(async () => {
-      if (this.family !== FAMILY_A) throw new Error('Réaffectation non décodée sur ce firmware');
+      if (this.family !== FAMILY_A) {
+        if (factory) return defaultKeymap();
+        throw new Error('Ce firmware ne permet pas de relire les touches');
+      }
       const cmd = layer === 'fn'
         ? (factory ? CMD.GET_DEFAULT_FN_KEY_MATRIX : CMD.GET_FN_KEY)
         : (factory ? CMD.GET_DEFAULT_KEY_MATRIX : CMD.GET_KEY);
@@ -1162,7 +1192,12 @@ class Keyboard {
 
   setKeymap(layer, slots) {
     return this.mutex.run(async () => {
-      if (this.family !== FAMILY_A) throw new Error('Réaffectation non décodée sur ce firmware');
+      if (this.family !== FAMILY_A) {
+        const table = legacyEncodeKeymap(slots);
+        const blocks = [];
+        for (let i = 0; i < 9; i++) blocks.push(table.slice(i * 64, i * 64 + 64));
+        return this.bTransaction(0, controlPacket(layer === 'fn' ? B.KEYMAP_FN : B.KEYMAP, 0, 9), blocks);
+      }
       return this.aSetMany(layer === 'fn' ? CMD.SET_FN_KEY : CMD.SET_KEY, encodeKeymap(slots), 0, true);
     });
   }
@@ -1228,7 +1263,7 @@ class Keyboard {
   }
 }
 
-return { VENDOR_ID, PRODUCT_IDS, CONTROL_USAGE_PAGES, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, FAMILY_A, FAMILY_B, PACKET_LEN, HEADER_LEN, PAYLOAD_PER_PACKET, CMD, buildFrame, MODES, MODE_CUSTOM, DIRECTION, supportedDirections, parseHex, ledEffectPayload, parseDeviceInfo, SLEEP_A, SLEEP_B, clockPayload, LED_COUNT, encodeCustomLeds, decodeCustomLeds, KEYMAP_BYTES, PAGE, decodeKeyAction, encodeKeyAction, decodeKeymap, encodeKeymap, TFT_SIZE, FRAME_BYTES, TFT_HEADER_BYTES, rgb565, rgbaToRgb565, encodeAnimationA, tftChunkHeader, LEGACY_CHUNK, LEGACY_MAX_FRAMES, encodeAnimationB, B, controlPacket, legacyLightingPacket, legacySleepPacket, legacyClockPacket, ANSI_LED_SLOTS, legacyEncodeBank, legacyCustomModePacket, parseLegacyBattery, reportBytes, classify, sleep, Endpoint, Keyboard };
+return { VENDOR_ID, PRODUCT_IDS, CONTROL_USAGE_PAGES, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, FAMILY_A, FAMILY_B, PACKET_LEN, HEADER_LEN, PAYLOAD_PER_PACKET, CMD, buildFrame, MODES, MODE_CUSTOM, DIRECTION, supportedDirections, parseHex, ledEffectPayload, parseDeviceInfo, SLEEP_A, SLEEP_B, clockPayload, LED_COUNT, encodeCustomLeds, decodeCustomLeds, KEYMAP_BYTES, PAGE, decodeKeyAction, encodeKeyAction, decodeKeymap, encodeKeymap, TFT_SIZE, FRAME_BYTES, TFT_HEADER_BYTES, rgb565, rgbaToRgb565, encodeAnimationA, tftChunkHeader, LEGACY_CHUNK, LEGACY_MAX_FRAMES, encodeAnimationB, B, controlPacket, legacyLightingPacket, legacySleepPacket, legacyClockPacket, ANSI_LED_SLOTS, legacyEncodeBank, encodeKeyActionB, legacyEncodeKeymap, LEGACY_KEY_SLOTS, defaultKeymap, legacyCustomModePacket, parseLegacyBattery, reportBytes, classify, sleep, Endpoint, Keyboard };
 })();
 
 // ---- layouts.js
@@ -1573,7 +1608,7 @@ return { mockFamilyA, mockFamilyB };
 
 // ---- app.js
 __mod.app = (() => {
-const { VENDOR_ID, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, CONTROL_USAGE_PAGES, FAMILY_A, MODES, supportedDirections, classify, Keyboard, TFT_SIZE, LEGACY_MAX_FRAMES, parseHex, } = __mod.protocol;
+const { VENDOR_ID, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, CONTROL_USAGE_PAGES, FAMILY_A, MODES, supportedDirections, classify, Keyboard, TFT_SIZE, LEGACY_MAX_FRAMES, parseHex, defaultKeymap, LEGACY_KEY_SLOTS, } = __mod.protocol;
 const { LAYOUTS } = __mod.layouts;
 const { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } = __mod.keycodes;
 const { decodeFile, renderFrame, toPixels } = __mod.image;
@@ -2027,7 +2062,10 @@ function hidLabels() {
   return m;
 }
 function initKeymap() {
-  kmEls = buildKb($('#km-kb'), (slot) => { state.km.selected = slot; renderKeymap(); renderPicker(); });
+  kmEls = buildKb($('#km-kb'), (slot) => {
+    if (!keyRemappable(slot)) { toast('Cette touche n\'est pas réaffectable sur ce firmware.'); return; }
+    state.km.selected = slot; renderKeymap(); renderPicker();
+  });
   segBind($('#km-layer'), state.km.layer, (v) => { state.km.layer = v; state.km.selected = null; ensureKeymap(); renderKeymap(); renderPicker(); });
   $('#km-search').oninput = renderPicker;
   $('#km-revert').onclick = () => { const L = state.km.layer; state.km.draft[L] = state.km.device[L].map((a) => ({ ...a })); renderKeymap(); renderPicker(); };
@@ -2038,15 +2076,24 @@ function initKeymap() {
   $('#km-write').onclick = (e) => run(e.currentTarget, async () => {
     const L = state.km.layer;
     await state.kb.setKeymap(L, state.km.draft[L]);
-    state.km.device[L] = await state.kb.getKeymap(L);
+    if (state.kb.caps.keymapRead) state.km.device[L] = await state.kb.getKeymap(L);
+    else { state.km.device[L] = state.km.draft[L].map((a) => ({ ...a })); store.set('keymapB.' + L, state.km.device[L]); }
     state.km.draft[L] = state.km.device[L].map((a) => ({ ...a }));
     renderKeymap();
   }, 'Touches enregistrées sur le clavier');
 }
+const keyRemappable = (slot) => !state.kb || state.kb.caps.keymapRead || LEGACY_KEY_SLOTS.has(slot);
 async function ensureKeymap() {
   if (!state.kb || !state.kb.caps.keymap) return;
   const L = state.km.layer;
   if (state.km.device[L]) return renderKeymap();
+  if (!state.kb.caps.keymapRead) {
+    // Pas de relecture : on repart de ce qui a été écrit depuis ce navigateur.
+    const saved = store.get('keymapB.' + L, null);
+    state.km.device[L] = saved && saved.length === 128 ? saved : defaultKeymap();
+    state.km.draft[L] = state.km.device[L].map((a) => ({ ...a }));
+    return renderKeymap();
+  }
   await run(null, async () => {
     state.km.device[L] = await state.kb.getKeymap(L);
     state.km.draft[L] = state.km.device[L].map((a) => ({ ...a }));
@@ -2067,6 +2114,7 @@ function renderKeymap() {
     el.firstChild.textContent = isDefault ? k.label : actionLabel(a, labels);
     el.classList.toggle('mod', !isDefault);
     el.classList.toggle('sel', state.km.selected === k.slot);
+    el.classList.toggle('na', !keyRemappable(k.slot));
   }
   $('#km-count').textContent = changed ? `${changed} modification${changed > 1 ? 's' : ''} à écrire` : '';
   $('#km-write').disabled = !changed;
@@ -2084,7 +2132,7 @@ function renderPicker() {
   const cur = state.km.draft[L][slot];
   const labels = hidLabels();
   const groups = [
-    ['Origine', [[{ kind: 'keyboard', usage: key.hid }, `${key.label || 'Espace'} (origine)`]]],
+    ['Origine', [[state.kb.caps.keymapRead ? { kind: 'keyboard', usage: key.hid } : { kind: 'default' }, `${key.label || 'Espace'} (origine)`]]],
     ['Touches du clavier', [...labels].map(([u, l]) => [{ kind: 'keyboard', usage: u }, l])],
     ['Autres touches', EXTRA_KEYS.map(([u, l]) => [{ kind: 'keyboard', usage: u }, l])],
     ['Multimédia', CONSUMER.map(([v, l]) => [{ kind: 'consumer', value: v }, l])],
@@ -2212,7 +2260,7 @@ async function onConnected() {
   $('span', st).textContent = `${kb.name}${state.demo ? ' (démo)' : ''}`;
   $('#connect span').textContent = 'Changer';
   $$('#nav button').forEach((b) => (b.disabled = false));
-  $('#keymap-unsupported').classList.toggle('hidden', kb.caps.keymap);
+  $('#keymap-unsupported').classList.toggle('hidden', kb.caps.keymapRead);
   $('#keymap-body').classList.toggle('hidden', !kb.caps.keymap);
   $('#tft-factory').classList.toggle('hidden', !kb.caps.tftBuiltIn);
   $('#pk-read').classList.toggle('hidden', kb.family !== FAMILY_A);

@@ -33,7 +33,7 @@ Les AK820 Pro n'ont pas tous le même protocole. L'application le détecte d'apr
 |---|---|---|
 | Interfaces | contrôle `0xFF68`, écran `0xFF67` | contrôle `0xFF13`, écran `0xFF68` |
 | Éclairage, couleurs par touche, écran, horloge, veille | oui | oui |
-| Réaffectation des touches | oui | non décodée |
+| Réaffectation des touches | oui | écriture seule (commandes 0x11 et 0x27, relevées dans le pilote Windows 1.0.0.5), sauf « < > » |
 | Envoi | immédiat | à la demande (chaque envoi s'écrit en flash) |
 
 Sur la famille B, la correspondance des LED par touche n'est connue que pour la disposition ANSI.

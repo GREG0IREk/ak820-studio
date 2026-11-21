@@ -2,6 +2,7 @@
 import {
   VENDOR_ID, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, CONTROL_USAGE_PAGES, FAMILY_A,
   MODES, supportedDirections, classify, Keyboard, TFT_SIZE, LEGACY_MAX_FRAMES, parseHex,
+  defaultKeymap, LEGACY_KEY_SLOTS,
 } from './protocol.js';
 import { LAYOUTS } from './layouts.js';
 import { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } from './keycodes.js';
@@ -451,7 +452,10 @@ function hidLabels() {
   return m;
 }
 function initKeymap() {
-  kmEls = buildKb($('#km-kb'), (slot) => { state.km.selected = slot; renderKeymap(); renderPicker(); });
+  kmEls = buildKb($('#km-kb'), (slot) => {
+    if (!keyRemappable(slot)) { toast('Cette touche n\'est pas réaffectable sur ce firmware.'); return; }
+    state.km.selected = slot; renderKeymap(); renderPicker();
+  });
   segBind($('#km-layer'), state.km.layer, (v) => { state.km.layer = v; state.km.selected = null; ensureKeymap(); renderKeymap(); renderPicker(); });
   $('#km-search').oninput = renderPicker;
   $('#km-revert').onclick = () => { const L = state.km.layer; state.km.draft[L] = state.km.device[L].map((a) => ({ ...a })); renderKeymap(); renderPicker(); };
@@ -462,15 +466,24 @@ function initKeymap() {
   $('#km-write').onclick = (e) => run(e.currentTarget, async () => {
     const L = state.km.layer;
     await state.kb.setKeymap(L, state.km.draft[L]);
-    state.km.device[L] = await state.kb.getKeymap(L);
+    if (state.kb.caps.keymapRead) state.km.device[L] = await state.kb.getKeymap(L);
+    else { state.km.device[L] = state.km.draft[L].map((a) => ({ ...a })); store.set('keymapB.' + L, state.km.device[L]); }
     state.km.draft[L] = state.km.device[L].map((a) => ({ ...a }));
     renderKeymap();
   }, 'Touches enregistrées sur le clavier');
 }
+const keyRemappable = (slot) => !state.kb || state.kb.caps.keymapRead || LEGACY_KEY_SLOTS.has(slot);
 async function ensureKeymap() {
   if (!state.kb || !state.kb.caps.keymap) return;
   const L = state.km.layer;
   if (state.km.device[L]) return renderKeymap();
+  if (!state.kb.caps.keymapRead) {
+    // Pas de relecture : on repart de ce qui a été écrit depuis ce navigateur.
+    const saved = store.get('keymapB.' + L, null);
+    state.km.device[L] = saved && saved.length === 128 ? saved : defaultKeymap();
+    state.km.draft[L] = state.km.device[L].map((a) => ({ ...a }));
+    return renderKeymap();
+  }
   await run(null, async () => {
     state.km.device[L] = await state.kb.getKeymap(L);
     state.km.draft[L] = state.km.device[L].map((a) => ({ ...a }));
@@ -491,6 +504,7 @@ function renderKeymap() {
     el.firstChild.textContent = isDefault ? k.label : actionLabel(a, labels);
     el.classList.toggle('mod', !isDefault);
     el.classList.toggle('sel', state.km.selected === k.slot);
+    el.classList.toggle('na', !keyRemappable(k.slot));
   }
   $('#km-count').textContent = changed ? `${changed} modification${changed > 1 ? 's' : ''} à écrire` : '';
   $('#km-write').disabled = !changed;
@@ -508,7 +522,7 @@ function renderPicker() {
   const cur = state.km.draft[L][slot];
   const labels = hidLabels();
   const groups = [
-    ['Origine', [[{ kind: 'keyboard', usage: key.hid }, `${key.label || 'Espace'} (origine)`]]],
+    ['Origine', [[state.kb.caps.keymapRead ? { kind: 'keyboard', usage: key.hid } : { kind: 'default' }, `${key.label || 'Espace'} (origine)`]]],
     ['Touches du clavier', [...labels].map(([u, l]) => [{ kind: 'keyboard', usage: u }, l])],
     ['Autres touches', EXTRA_KEYS.map(([u, l]) => [{ kind: 'keyboard', usage: u }, l])],
     ['Multimédia', CONSUMER.map(([v, l]) => [{ kind: 'consumer', value: v }, l])],
@@ -636,7 +650,7 @@ async function onConnected() {
   $('span', st).textContent = `${kb.name}${state.demo ? ' (démo)' : ''}`;
   $('#connect span').textContent = 'Changer';
   $$('#nav button').forEach((b) => (b.disabled = false));
-  $('#keymap-unsupported').classList.toggle('hidden', kb.caps.keymap);
+  $('#keymap-unsupported').classList.toggle('hidden', kb.caps.keymapRead);
   $('#keymap-body').classList.toggle('hidden', !kb.caps.keymap);
   $('#tft-factory').classList.toggle('hidden', !kb.caps.tftBuiltIn);
   $('#pk-read').classList.toggle('hidden', kb.family !== FAMILY_A);
