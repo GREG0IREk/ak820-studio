@@ -24,7 +24,7 @@ ACCENTS='éèêëàâçùûôîïÉÈÊÀÇÛÔÎ°'
 TIME_GLYPHS='0123456789:-'
 VALUE_GLYPHS='0123456789:%/ minJas°-'
 
-cp "$HERE/make_sources.py" "$WORK/"
+cp "$HERE/make_sources.py" "$HERE/make_font_image.py" "$WORK/"
 curl -fsSL "$FONTS/spacegrotesk/SpaceGrotesk%5Bwght%5D.ttf" -o "$WORK/SpaceGrotesk.ttf"
 curl -fsSL "$FONTS/inter/Inter%5Bopsz,wght%5D.ttf" -o "$WORK/Inter.ttf"
 curl -fsSL "$FONTS/vt323/VT323-Regular.ttf" -o "$WORK/VT323.ttf"
@@ -42,9 +42,11 @@ docker run --rm -v "$WORK:/w" -w /w python:3.12-slim sh -c '
 docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$WORK:/w" -v "$QMK_DIR:/qmk_firmware" -w /qmk_firmware "$QMK_IMAGE" sh -c "
   set -e
   mkdir -p /w/out/res_cadran /w/out/res_terminal /w/out/res_tuiles
+  # make_font_image.py remplace « qmk painter-make-font-image », qui coupe le bas
+  # des jambages (g, p, y) quand la police contient des majuscules accentuées.
   font() {
     n=''; [ \"\$6\" = noascii ] && n=-n
-    qmk painter-make-font-image --font /w/src/\$3 --size \$4 \$n -u \"\$5\" -o /w/src/\$2.png
+    python3 -I /w/make_font_image.py /w/src/\$3 \$4 \$6 \"\$5\" /w/src/\$2.png
     qmk painter-convert-font-image --input /w/src/\$2.png -f mono4 \$n -u \"\$5\" -o /w/out/\$1 >/dev/null
   }
   for f in /w/src/ic_*_26.png /w/src/ic_*_18.png; do qmk painter-convert-graphics -i \"\$f\" -f mono4 -o /w/out/res_cadran >/dev/null; done

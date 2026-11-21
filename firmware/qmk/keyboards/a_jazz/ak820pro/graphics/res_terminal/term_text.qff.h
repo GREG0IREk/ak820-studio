@@ -12,4 +12,4 @@
 #include <qp.h>
 
 extern const uint32_t font_term_text_length;
-extern const uint8_t  font_term_text[2687];
+extern const uint8_t  font_term_text[2705];
