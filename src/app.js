@@ -228,6 +228,7 @@ function refreshLightingUi() {
   if (dirs.length && !dirs.includes(L.direction)) L.direction = dirs[0];
   seg($('#light-direction'), dirs.map((d) => ({ value: d, label: labels[d] })), L.direction, (v) => { L.direction = v; lightingChanged(); });
   $('#dir-reveal').classList.toggle('open', dirs.length > 0);
+  $$('#light-speed button').forEach((b) => (b.disabled = L.mode <= 1)); // Éteint, Fixe : pas d'animation
   const live = state.kb && state.kb.caps.liveLighting;
   $('#light-apply-row').classList.toggle('hidden', !!live);
   $('#lighting-lead').textContent = live

@@ -119,7 +119,7 @@ export function ledEffectPayload(cfg) {
   p[5] = sr; p[6] = sg; p[7] = sb;
   p[8] = cfg.colorMode | 0;
   p[9] = clamp(cfg.brightness, 0, 5);
-  p[10] = clamp(cfg.speed, 0, 5);
+  p[10] = cfg.mode === 0x01 || cfg.mode === 0x00 ? 0 : clamp(cfg.speed, 0, 5); // Fixe : aucune animation
   p[11] = DIRECTION[cfg.direction] ?? 0;
   p[12] = cfg.effectModeType | 0;
   p[14] = 0xaa;
@@ -303,12 +303,16 @@ export function controlPacket(command, sub, value) {
   return p;
 }
 
-/** Effet famille B. Éteint = SingleOn luminosité 0 ; Fixe = Respiration vitesse 0. */
+/**
+ * Effet famille B. Éteint = SingleOn luminosité 0. Fixe = vrai mode 0x01 à vitesse 0,
+ * comme gohv/EPOMAKER-Ajazz-AK820-Pro : « Respiration vitesse 0 » (vespovios) respire
+ * encore sur certains claviers (constaté sur celui de Grégoire le 21/11/2026).
+ */
 export function legacyLightingPacket(cfg) {
   if (cfg.mode === MODE_CUSTOM) throw new Error('Le mode personnalisé passe par legacySelectCustom');
   let mode = cfg.mode, speed = clamp(cfg.speed, 0, 5), brightness = clamp(cfg.brightness, 0, 5);
   if (mode === 0x00) { mode = 0x02; speed = 0; brightness = 0; }
-  else if (mode === 0x01) { mode = 0x07; speed = 0; }
+  else if (mode === 0x01) speed = 0;
   const [r, g, b] = parseHex(cfg.color) || [255, 255, 255];
   const p = new Uint8Array(64);
   p[0] = mode;

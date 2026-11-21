@@ -18,7 +18,8 @@ test('buildFrame : en-tête et bourrage', () => {
 
 test('SET_LED_EFFECT : disposition officielle et bornes', () => {
   const p = P.ledEffectPayload({ mode: 1, color: 'FF0000', brightness: 3, speed: 5, direction: 'left', colorMode: 0 });
-  assert.deepEqual(Array.from(p), [1, 255, 0, 0, 0xff, 0, 0, 0, 0, 3, 5, 0, 0, 0, 0xaa, 0x55]);
+  assert.deepEqual(Array.from(p), [1, 255, 0, 0, 0xff, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0xaa, 0x55], 'Fixe : vitesse forcée à 0');
+  assert.equal(P.ledEffectPayload({ mode: 7, color: 'FF0000', brightness: 3, speed: 5 })[10], 5);
   const q = P.ledEffectPayload({ mode: 4, color: '#FFFFFF', brightness: 99, speed: 99, direction: 'up' });
   assert.equal(q[9], 5); assert.equal(q[10], 5); assert.equal(q[11], 2);
 });
@@ -79,7 +80,7 @@ test('animation famille B : délais en 2 ms, bourrage FF, 30 images au plus', ()
 
 test('famille B : paquets effet, veille, mode personnalisé', () => {
   const p = P.legacyLightingPacket({ mode: 1, color: '123456', brightness: 3, speed: 5, direction: 'left', colorMode: 0 });
-  assert.deepEqual(arr(p, 0, 4), [7, 0x12, 0x34, 0x56]);
+  assert.deepEqual(arr(p, 0, 4), [1, 0x12, 0x34, 0x56], 'Fixe = vrai mode 0x01');
   assert.deepEqual(arr(p, 8, 16), [0, 3, 0, 0, 0, 0, 0x55, 0xaa]);
   assert.deepEqual(arr(P.legacyLightingPacket({ mode: 0, color: '123456', brightness: 3, speed: 5 }), 8, 11), [0, 0, 0]);
   assert.throws(() => P.legacyLightingPacket({ mode: 0x80 }));
@@ -193,7 +194,7 @@ test('famille B : START, préambule, données, COMMIT, FINISH', async () => {
   await kb.open();
   await kb.setLighting({ mode: 1, color: '#123456', brightness: 3, speed: 5, direction: 'left' });
   const ops = devices[0].sent.map((s) => [s.data[0], s.data[1], s.data[8]]);
-  assert.deepEqual(ops, [[4, 0x18, 1], [4, 0x13, 1], [7, 0x12, 0], [4, 0x02, 0], [4, 0xf0, 1]]);
+  assert.deepEqual(ops, [[4, 0x18, 1], [4, 0x13, 1], [1, 0x12, 0], [4, 0x02, 0], [4, 0xf0, 1]]);
 
   devices[0].sent.length = 0;
   await kb.setPerKey(Array.from({ length: 128 }, () => [1, 2, 3]), 5);
