@@ -1,15 +1,17 @@
 # Micrologiciel « Cadran » pour l'AK820 Pro
 
-Micrologiciel QMK pour l'écran et la molette de l'AK820 Pro. Il part du portage QMK de [fpb](https://github.com/fpb/qmk_firmware/tree/ak820pro-lcd-embedded) (branche `ak820pro-lcd-embedded`, commit `75d2d9b`) et remplace son interface d'écran par celle de la maquette « Cadran ».
+Micrologiciel QMK pour l'écran et la molette de l'AK820 Pro. Il part du portage QMK de [fpb](https://github.com/fpb/qmk_firmware/tree/ak820pro-lcd-embedded) (branche `ak820pro-lcd-embedded`, commit `75d2d9b`) et remplace son interface d'écran par trois interfaces au choix : Cadran, Terminal et Tuiles.
 
 Il remplace le micrologiciel Ajazz. Depuis la version 1.1, AK820 Studio (l'application web de ce dépôt) le règle par l'USB : éclairage, couleurs par touche, touches, veille, horloge (voir « AK820 Studio » plus bas). La version 1.0 n'était pas réglable par le site.
 
 ## Ce qu'il fait
 
-**Écran (128 × 128)**
-- Accueil : heure, date, mode de connexion (USB, BT 1-3, 2,4 GHz), batterie, voyant Verr. Maj, anneau orange qui se remplit avec les secondes.
-- Menu : carrousel d'icônes (Effet, Luminosité, Vitesse, Couleur, Veille, Retour), nom de l'entrée et valeur actuelle dessous.
-- Réglage : la valeur s'affiche au centre et sur l'anneau. Le changement est appliqué en direct sur les touches.
+**Écran (128 × 128)**, trois interfaces au choix (entrée Écran du menu ou page Écran d'AK820 Studio, depuis 1.2) :
+- Cadran : fond sombre, anneau orange qui se remplit avec les secondes, menu en carrousel d'icônes ;
+- Terminal : police pixel verte sur fond noir, menu en liste avec la ligne choisie en vidéo inversée ;
+- Tuiles : fond clair et tuiles blanches, menu en grille de six cases.
+
+Toutes affichent à l'accueil l'heure, la date, la connexion (USB, BT 1-3, 2,4 GHz), la batterie et Verr. Maj. Le menu propose Effet, Luminosité, Vitesse, Couleur, Veille et Écran. En réglage, le changement est appliqué en direct sur les touches. Fonctionnement et ajout d'une interface : [ECRAN.md](ECRAN.md).
 
 **Molette**
 
@@ -27,6 +29,7 @@ Sans action pendant 15 s, le menu se referme et garde le réglage en cours.
 - Vitesse : 1 à 5.
 - Couleur : teinte par pas de 20°.
 - Veille de l'écran et de l'éclairage : 1, 3, 5 ou 10 min, ou jamais.
+- Écran : Cadran, Terminal ou Tuiles. Le changement est visible tout de suite. Depuis la 1.2, cette entrée remplace « Retour » : l'appui long revient à l'accueil.
 
 Les réglages sont gardés en mémoire (EEPROM) et survivent au débranchement. Les raccourcis Fn du portage fpb restent actifs : Fn+Q/W/E pour le Bluetooth, Fn+R pour le 2,4 GHz, Fn+\ pour l'effet suivant, Fn+flèches pour la couleur et la luminosité, Fn+Échap pour le mode flash.
 
@@ -92,20 +95,25 @@ Passer en mode flash (Fn+Échap), puis écrire le micrologiciel d'origine : `AJA
 sh firmware/assets/generate.sh firmware/.build/qmk_firmware
 ```
 
-Le script télécharge Space Grotesk (Google Fonts), dessine les icônes à partir des mêmes tracés SVG que la maquette, puis les convertit au format Quantum Painter dans `qmk/keyboards/a_jazz/ak820pro/graphics/res_cadran/`. Il faut avoir lancé `build.sh` une fois avant.
+Le script télécharge Space Grotesk, VT323 et Inter (Google Fonts) et dessine les icônes à partir des mêmes tracés SVG que les maquettes. Il convertit ensuite le tout au format Quantum Painter dans `qmk/keyboards/a_jazz/ak820pro/graphics/res_*/`. Il faut avoir lancé `build.sh` une fois avant. Détails dans [ECRAN.md](ECRAN.md).
 
 ## Fichiers
 
 | Fichier | Rôle |
 |---|---|
 | `build.sh` | compilation reproductible (Docker) |
-| `qmk/keyboards/a_jazz/ak820pro/graphics/display.c` | interface Cadran : accueil, menu, réglages, anneau |
+| `ECRAN.md` | fonctionnement de l'écran, ajout d'une interface, simulateur |
+| `qmk/keyboards/a_jazz/ak820pro/graphics/display.c` | socle de l'écran : état, menu de la molette, réglages, veille, choix de l'interface |
+| `qmk/keyboards/a_jazz/ak820pro/graphics/ui.h` | contrat entre le socle et les interfaces |
+| `qmk/keyboards/a_jazz/ak820pro/graphics/theme_*.c` | interfaces Cadran, Terminal, Tuiles |
 | `qmk/keyboards/a_jazz/ak820pro/ak820pro.c` | fichier du portage + délai de veille réglable + commandes système HID |
 | `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/` | keymap : molette (volume, sourdine, menu), effet Réactif |
 | `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/studio.c` | canal HID d'AK820 Studio (éclairage, touches, couleurs par touche, veille) |
 | `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/rgb_matrix_user.inc` | effet « Personnalisé » |
-| `qmk/keyboards/a_jazz/ak820pro/graphics/res_cadran/` | polices et icônes générées |
+| `qmk/keyboards/a_jazz/ak820pro/graphics/res_*/` | polices et icônes générées |
 | `assets/` | génération des polices et icônes |
+| `sim/` | simulateur de l'écran sur PC (captures PNG) |
+| `maquettes/` | maquettes HTML des trois interfaces |
 | `tools/ak820-maj.c` | outil PC : version, passage en mode flash |
 | `tools/flash.ps1` | flash complet depuis Windows |
 | `tools/sonixflasher/hidapi-windows.patch` | correctif de SonixFlasherC pour Windows |
@@ -118,7 +126,7 @@ Ouvrir AK820 Studio ([site](https://greg0irek.github.io/ak820-studio/) ou `dist/
 |---|---|
 | Éclairage | les effets du menu de l'écran, couleur, luminosité, vitesse ; envoi immédiat et enregistré |
 | Touche par touche | couleurs par touche, lues et écrites ; l'envoi passe le clavier sur l'effet « Personnalisé » |
-| Écran | mise à l'heure de l'horloge (l'écran garde l'interface Cadran, pas d'envoi d'image) |
+| Écran | choix de l'interface avec aperçu (1.2), mise à l'heure de l'horloge ; pas d'envoi d'image |
 | Touches | 4 couches (Windows, Windows + Fn, Mac, Mac + Fn), lecture, écriture des seules touches modifiées, retour aux valeurs d'origine ; « Tester les touches » affiche la position de chaque touche enfoncée |
 | Système | version, batterie, délai de veille |
 
@@ -130,6 +138,15 @@ Ce que la 1.1 change dans le firmware :
 - keymap modifiable (`DYNAMIC_KEYMAP_ENABLE`) : la keymap compilée sert de valeurs d'origine, la keymap active est en EEPROM ;
 - effet « Personnalisé » (`rgb_matrix_user.inc`), couleurs dans le bloc utilisateur de l'EEPROM ;
 - EEPROM émulée portée de 1 à 2 Ko (4 Ko de flash) pour loger le tout.
+
+Ce que la 1.2 change :
+- l'écran est découpé en un socle (`display.c`) et une interface par fichier (`theme_*.c`) ;
+- interfaces Terminal et Tuiles ;
+- entrée Écran dans le menu ;
+- commandes `0x0D` et `0x0E` du canal (protocole 2) ;
+- fond de Cadran en gris neutre, ce qui supprime les bords roses des icônes.
+
+L'interface choisie est enregistrée dans un octet libre du bloc EEPROM du clavier : le passage de 1.1 à 1.2 garde tous les réglages.
 
 **Passage de 1.0 à 1.1 : l'EEPROM repart de zéro.** L'EEPROM émulée change de taille et d'emplacement en flash : effet, couleur, luminosité, délai de veille et dernier profil Bluetooth reviennent aux valeurs par défaut au premier démarrage. Les appareils appairés en Bluetooth sont gardés par la puce radio, pas par ce firmware.
 
@@ -158,6 +175,6 @@ Une erreur à l'étape 1 coupe le sans-fil jusqu'à reprogrammation à la sonde.
 ## Licences
 
 - `qmk/` : GPL-2.0 ou ultérieure, comme QMK et le portage fpb.
-- Polices générées : Space Grotesk, SIL Open Font License 1.1.
+- Polices générées : Space Grotesk, VT323 et Inter, SIL Open Font License 1.1.
 - `tools/sonixflasher/` : correctif de SonixFlasherC (GPL-3.0).
 - Le reste du dépôt : MIT.

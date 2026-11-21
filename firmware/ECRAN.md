@@ -149,6 +149,8 @@ ssh greg@192.168.0.174 'cd ~/ak820-build && sh firmware/assets/generate.sh ~/ak8
 
 Rapatrier ensuite les dossiers `res_*`, et mettre à jour `../rules.mk` si des fichiers ont été ajoutés ou retirés.
 
+Les images de police sont produites par `assets/make_font_image.py` et non par `qmk painter-make-font-image`. Celui de QMK cale le haut des caractères sur le plus haut (É, Î) mais garde une zone de hauteur ascent + descent : le bas de g, p, q et y disparaissait en VT323 16 px et en Inter 8 px. `make_font_image.py <ttf> <taille> ascii "<caractères>" x.png --check` indique si une police serait touchée.
+
 ## Écrire une interface
 
 Partir de `theme_cadran.c`, qui fait tout ce qu'il faut :
@@ -216,4 +218,10 @@ Le simulateur ne reproduit pas la vitesse du SPI ni les couleurs exactes de la d
 - **Le type `char`** est non signé sur le microcontrôleur (ARM) et signé sur PC. Le simulateur compile avec `-funsigned-char`, sinon les caractères accentués disparaissent.
 - **Un caractère absent de la police** n'est pas dessiné, sans erreur. Exemples : une lettre dans `font_term_huge`, ou le « ° » dans une police qui ne l'a pas.
 - **Hauteur réelle du texte.** `f->line_height` est la hauteur de la ligne, pas celle des chiffres. Les grands chiffres ont souvent quelques pixels vides au-dessus. Ajuster `y` d'après la planche.
+- **Aperçus du site.** Après un changement d'interface, régénérer `src/ecrans.js` :
+  ```sh
+  sh firmware/sim/run.sh
+  python3 firmware/sim/previews.py
+  python3 build.py
+  ```
 - **Changer de police au dessin partiel.** Si une valeur peut passer d'une police à l'autre (texte court puis texte long), effacer la zone la plus grande des deux.

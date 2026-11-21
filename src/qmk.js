@@ -21,7 +21,7 @@ export const CH_STUDIO = 0x14;
 export const QC = {
   INFO: 0x01, EFFECT_NAME: 0x02, LIGHT_GET: 0x03, LIGHT_SET: 0x04, SLEEP_SET: 0x05,
   KEYMAP_GET: 0x06, KEY_SET: 0x07, KEYMAP_DEFAULT: 0x08, MATRIX: 0x09,
-  PERKEY_GET: 0x0a, PERKEY_SET: 0x0b, PERKEY_SAVE: 0x0c,
+  PERKEY_GET: 0x0a, PERKEY_SET: 0x0b, PERKEY_SAVE: 0x0c, THEME_NAME: 0x0d, THEME_SET: 0x0e,
 };
 export const SYS_VERSION = 0x02;
 export const Q_KEYMAP_CHUNK = 26;
@@ -52,6 +52,8 @@ export function qParseInfo(r) {
     sleepIndex: a[7], perkeyEffect: a[8] === 0xff ? null : a[8], defaultLayer: a[9],
     battery: a[10] === 0xff ? null : a[10],
     sleepMinutes: Array.from(a.slice(11, 11 + n)),
+    // Protocole 2 (Cadran 1.2) : interfaces de l'écran.
+    themeCount: a[0] >= 2 ? a[16] : 0, theme: a[0] >= 2 ? a[17] : null,
   };
 }
 

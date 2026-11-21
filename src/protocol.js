@@ -563,6 +563,7 @@ export class Keyboard {
         tft: false, tftUpload: false, tftBuiltIn: false, clock: true, liveLighting: true, secondary: false, rainbowOption: false,
         modes: m.effects, layers: Q_LAYERS.slice(0, m.layers), remapSlots: new Set(SLOT_MATRIX.keys()), matrixTest: true,
         sleep: m.sleepMinutes.map((min, i) => ({ value: i, label: min ? `${min} min` : 'Jamais' })),
+        screenThemes: m.themes.map((name, i) => ({ value: i, label: name })),
       };
     }
     const a = this.family === FAMILY_A;
@@ -572,7 +573,7 @@ export class Keyboard {
       info: a, keymap: true, keymapRead: a, perKey: true, perKeyRead: a, perKeySlots, perKeyIsoComplete: a, tft: !!this.tft, tftUpload: true,
       tftBuiltIn: a, clock: true, liveLighting: a, secondary: a, rainbowOption: true, modes,
       layers: [{ id: 'base', label: 'Couche normale' }, { id: 'fn', label: 'Couche Fn' }], remapSlots: a ? null : LEGACY_KEY_SLOTS,
-      matrixTest: false, sleep: a ? SLEEP_A : SLEEP_B,
+      matrixTest: false, sleep: a ? SLEEP_A : SLEEP_B, screenThemes: [],
     };
   }
 
@@ -600,7 +601,9 @@ export class Keyboard {
     let version = '';
     try { version = qString((await this.qCall(CH_SYS, SYS_VERSION)).slice(3)); } catch { /* version facultative */ }
     const maxBrightness = (await this.qCall(CH_STUDIO, QC.LIGHT_GET))[8] || 255;
-    this.qmeta = { ...info, effects, version, maxBrightness };
+    const themes = [];
+    for (let i = 0; i < info.themeCount; i++) themes.push(qString((await this.qCall(CH_STUDIO, QC.THEME_NAME, [i])).slice(4)));
+    this.qmeta = { ...info, effects, version, maxBrightness, themes };
     return this.qmeta;
   }
   qLayerIndex(layer) {
@@ -836,6 +839,21 @@ export class Keyboard {
         return this.aSet(CMD.SET_GAME_MODE, gm);
       }
       return this.bTransaction(1, controlPacket(B.SLEEP, 1, 1), [legacySleepPacket(value)]);
+    });
+  }
+
+  /** Interface de l'écran (firmware Cadran 1.2 et plus) : index dans caps.screenThemes. */
+  getScreenTheme() {
+    return this.mutex.run(async () => {
+      if (this.family !== FAMILY_Q) return null;
+      return qParseInfo(await this.qCall(CH_STUDIO, QC.INFO)).theme;
+    });
+  }
+
+  setScreenTheme(index) {
+    return this.mutex.run(async () => {
+      if (this.family !== FAMILY_Q) throw new Error('Interface d\'écran réservée au firmware Cadran');
+      await this.qCall(CH_STUDIO, QC.THEME_SET, [index]);
     });
   }
 

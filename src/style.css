@@ -102,6 +102,11 @@ h2 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
 .field + .field { margin-top: 16px; }
 .field > label, .field > .label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 .note { font-size: 13px; color: var(--muted); }
+#screen-theme-field, #screen-theme-old { margin-top: 16px; }
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 4px 0 8px; }
+.theme { display: grid; justify-items: center; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); color: var(--text); font-weight: 550; transition: border-color 0.15s, box-shadow 0.15s; }
+.theme img, .theme .theme-blank { display: block; width: 128px; height: 128px; border-radius: 6px; background: #000; image-rendering: pixelated; }
+.theme[aria-checked='true'] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .note.warn { color: var(--danger); }
 .hidden { display: none !important; }
 .field.off { opacity: 0.4; pointer-events: none; transition: opacity 0.2s; }

@@ -8,6 +8,7 @@ import { LAYOUTS } from './layouts.js';
 import { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } from './keycodes.js';
 import { decodeFile, renderFrame, toPixels } from './image.js';
 import { mockFamilyA, mockFamilyB, mockFamilyQ } from './mock.js';
+import { SCREEN_PREVIEWS } from './ecrans.js';
 import { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid } from './qmk.js';
 
 // ------------------------------------------------------------ outils
@@ -672,6 +673,37 @@ async function loadInfo() {
   seg($('#sys-sleep'), opts, cur ?? -1, (v) => run(null, () => kb.setSleep(v), 'Mise en veille réglée'));
 }
 
+/** Page Écran (firmware Cadran 1.2 et plus) : une vignette par interface. */
+async function loadScreenThemes() {
+  const kb = state.kb;
+  const list = kb.caps.screenThemes || [];
+  $('#screen-theme-field').classList.toggle('hidden', !list.length);
+  $('#screen-theme-old').classList.toggle('hidden', !(isQ() && !list.length));
+  if (!list.length) return;
+  const cur = await kb.getScreenTheme().catch(() => null);
+  const box = $('#screen-themes');
+  box.innerHTML = '';
+  for (const t of list) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'theme';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(t.value === cur));
+    const src = SCREEN_PREVIEWS[t.label.toLowerCase()];
+    const pic = document.createElement(src ? 'img' : 'span');
+    if (src) Object.assign(pic, { src, alt: '', width: 128, height: 128 });
+    else pic.className = 'theme-blank';
+    const name = document.createElement('span');
+    name.textContent = t.label;
+    b.append(pic, name);
+    b.onclick = () => run(null, async () => {
+      await kb.setScreenTheme(t.value);
+      $$('.theme', box).forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+    }, `Interface ${t.label} sur l'écran`);
+    box.appendChild(b);
+  }
+}
+
 function logLine(s) {
   state.log.push(s);
   if (state.log.length > 2000) state.log.shift();
@@ -749,6 +781,7 @@ async function onConnected() {
   paintPerKey();
   if (state.tft.encoded.length) $('#tft-send').disabled = false;
   await loadInfo();
+  await loadScreenThemes();
   const cur = await kb.getLighting().catch(() => null);
   if (cur && kb.caps.modes.some((m) => m.id === cur.mode)) { state.light = { ...state.light, ...cur }; store.set(lightKey(), state.light); initLighting(); }
   if (kb.caps.perKeyRead && isQ()) { const pk = await kb.getPerKey().catch(() => null); if (pk) { state.pk = pk; store.set('perkey', pk); paintPerKey(); } }

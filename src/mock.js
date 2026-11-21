@@ -151,6 +151,7 @@ export function mockFamilyQ(defaultHids = []) {
   const state = {
     keymap: factory.slice(), factory, light: [0, 20, 255, 160, 128], max: 200, sleep: 1, minutes: [1, 3, 5, 10, 0],
     perkey: new Uint8Array(Q_LED_COUNT * 3).fill(255), clock: null,
+    themes: ['Cadran', 'Terminal', 'Tuiles'], theme: 0,
   };
   const device = new FakeDevice({
     productId: 0x8009,
@@ -161,11 +162,11 @@ export function mockFamilyQ(defaultHids = []) {
       const refuse = () => { r[0] = 0xff; };
       if (d[0] !== 0x07) refuse();
       else if (d[1] === CH_CLOCK && d[2] === 1) state.clock = Array.from(d.slice(3, 10));
-      else if (d[1] === CH_SYS && d[2] === 2) { r.fill(0, 3); r.set(new TextEncoder().encode('cadran-1.1 (démo)'), 3); }
+      else if (d[1] === CH_SYS && d[2] === 2) { r.fill(0, 3); r.set(new TextEncoder().encode('cadran-1.2 (démo)'), 3); }
       else if (d[1] !== CH_STUDIO) refuse();
       else {
         switch (d[2]) {
-          case QC.INFO: r.fill(0, 3); r.set([1, effects.length, 4, Q_ROWS, Q_COLS, Q_LED_COUNT, 5, state.sleep, 8, 0, 87, ...state.minutes], 3); break;
+          case QC.INFO: r.fill(0, 3); r.set([2, effects.length, 4, Q_ROWS, Q_COLS, Q_LED_COUNT, 5, state.sleep, 8, 0, 87, ...state.minutes, state.themes.length, state.theme], 3); break;
           case QC.EFFECT_NAME: r.fill(0, 4); if (a(0) < effects.length) r.set(new TextEncoder().encode(effects[a(0)]), 4); else refuse(); break;
           case QC.LIGHT_GET: r.set([...state.light, state.max], 3); break;
           case QC.LIGHT_SET: state.light = [a(0), a(1), a(2), Math.min(a(3), state.max), a(4)]; break;
@@ -179,6 +180,8 @@ export function mockFamilyQ(defaultHids = []) {
           case QC.PERKEY_GET: r.set(state.perkey.slice(a(0) * 3, (a(0) + a(1)) * 3), 5); break;
           case QC.PERKEY_SET: state.perkey.set(d.slice(5, 5 + a(1) * 3), a(0) * 3); break;
           case QC.PERKEY_SAVE: if (a(0)) state.light[0] = 8; if (a(1) !== 0xff) state.light[3] = a(1); break;
+          case QC.THEME_NAME: r.fill(0, 4); if (a(0) < state.themes.length) r.set(new TextEncoder().encode(state.themes[a(0)]), 4); else refuse(); break;
+          case QC.THEME_SET: if (a(0) < state.themes.length) state.theme = a(0); else refuse(); break;
           default: refuse();
         }
       }

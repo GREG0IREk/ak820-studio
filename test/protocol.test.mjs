@@ -316,7 +316,7 @@ test('QMK : métadonnées, effets et version', async () => {
   assert.deepEqual(kb.caps.sleep.map((o) => o.label), ['1 min', '3 min', '5 min', '10 min', 'Jamais']);
   assert.equal(kb.caps.layers.length, 4);
   const info = await kb.info();
-  assert.equal(info.firmware, 'cadran-1.1 (démo)');
+  assert.equal(info.firmware, 'cadran-1.2 (démo)');
   assert.equal(info.batteryLevel, 87);
 });
 
@@ -370,6 +370,25 @@ test('QMK : veille, horloge, test des touches, refus', async () => {
   assert.deepEqual(mock.state.clock, [26, 11, 21, 6, 16, 40, 41]);
   assert.deepEqual(await kb.matrix(), []);
   await assert.rejects(kb.setSleep(9), /refusée/);
+});
+
+test('QMK : interfaces de l\'écran (protocole 2)', async () => {
+  const { kb, mock } = await openQ();
+  assert.deepEqual(kb.caps.screenThemes.map((t) => t.label), ['Cadran', 'Terminal', 'Tuiles']);
+  assert.equal(await kb.getScreenTheme(), 0);
+  await kb.setScreenTheme(2);
+  assert.equal(mock.state.theme, 2);
+  assert.equal(await kb.getScreenTheme(), 2);
+  await assert.rejects(kb.setScreenTheme(3), /refusée/);
+});
+
+test('QMK : protocole 1 (Cadran 1.1) sans interfaces', () => {
+  const r = new Uint8Array(32);
+  r.set([7, 0x14, 1, 1, 10, 4, 6, 15, 81, 5, 1, 8, 0, 100, 1, 3, 5, 10, 0, 3, 1]);
+  const info = Q.qParseInfo(r);
+  assert.equal(info.themeCount, 0);
+  assert.equal(info.theme, null);
+  assert.deepEqual(info.sleepMinutes, [1, 3, 5, 10, 0]);
 });
 
 test('QMK : firmware sans canal Studio', async () => {

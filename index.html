@@ -97,6 +97,12 @@
       <h1>Écran</h1>
       <div class="card hidden" id="screen-q">
         <p>Avec le firmware Cadran, l'écran affiche l'heure, la date, la connexion et la batterie, et le menu de la molette (appui long). Il n'a pas de mémoire pour une image : l'envoi d'images est réservé au firmware Ajazz.</p>
+        <div class="field hidden" id="screen-theme-field">
+          <div class="label">Interface</div>
+          <div class="themes" id="screen-themes" role="radiogroup" aria-label="Interface de l'écran"></div>
+          <p class="note">Se règle aussi au clavier : appui long sur la molette, entrée Écran.</p>
+        </div>
+        <p class="note hidden" id="screen-theme-old">Le choix entre les interfaces Cadran, Terminal et Tuiles demande Cadran 1.2 (dossier firmware du dépôt).</p>
         <div class="row" style="margin-top: 16px;"><button class="btn primary" id="tft-clock-q">Mettre l'horloge à l'heure</button></div>
       </div>
       <div id="screen-upload">

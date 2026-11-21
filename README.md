@@ -34,7 +34,7 @@ Les AK820 Pro n'ont pas tous le même protocole. L'application le détecte d'apr
 | Interfaces | contrôle `0xFF68`, écran `0xFF67` | contrôle `0xFF13`, écran `0xFF68` | HID brut QMK `0xFF60` |
 | Éclairage | 20 effets, direction | 20 effets, direction | les 10 effets du menu de l'écran |
 | Couleurs par touche | lecture et écriture | écriture | lecture et écriture (effet « Personnalisé ») |
-| Écran | image ou GIF, horloge | image ou GIF, horloge | horloge seulement (l'écran affiche l'interface Cadran) |
+| Écran | image ou GIF, horloge | image ou GIF, horloge | choix entre trois interfaces (1.2), horloge ; pas d'image |
 | Réaffectation des touches | 2 couches, lecture et écriture | 2 couches, écriture seule, sauf « < > » | 4 couches (Windows, Mac, et leur couche Fn), lecture, écriture, valeurs d'origine ; test des touches |
 | Veille | oui | oui | 1, 3, 5, 10 min ou jamais |
 | Envoi | immédiat | à la demande (chaque envoi s'écrit en flash) | immédiat |
@@ -43,7 +43,7 @@ Sur la famille B et sous Cadran, la correspondance des LED par touche n'est conn
 
 ## Micrologiciel QMK « Cadran »
 
-Pour remplacer le micrologiciel Ajazz par QMK avec une nouvelle interface d'écran (heure, menu à la molette pour l'éclairage) : [firmware/README.md](firmware/README.md). Depuis la version 1.1, AK820 Studio règle aussi ce firmware (canal HID `0x14`, décrit dans `firmware/qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/studio.c`). Cadran 1.0 n'a pas ce canal : l'application demande alors de mettre le firmware à jour.
+Pour remplacer le micrologiciel Ajazz par QMK avec une nouvelle interface d'écran (heure, menu à la molette pour l'éclairage, trois interfaces au choix) : [firmware/README.md](firmware/README.md). Depuis la version 1.1, AK820 Studio règle aussi ce firmware (canal HID `0x14`, décrit dans `firmware/qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/studio.c`). Cadran 1.0 n'a pas ce canal : l'application demande alors de mettre le firmware à jour.
 
 ## Développement
 
@@ -55,6 +55,7 @@ node --test test/protocol.test.mjs
 
 - `src/protocol.js` : trames, encodages, transactions des trois firmwares (sans DOM, testé sous Node).
 - `src/qmk.js` : firmware Cadran : paquets, correspondance touches / matrice / LED, codes de touche QMK.
+- `src/ecrans.js` : aperçus des interfaces de l'écran, générés par `firmware/sim/previews.py` à partir du simulateur.
 - `src/app.js` : interface. `src/image.js` : décodage et cadrage des images. `src/mock.js` : faux claviers.
 
 ## Origine du protocole
