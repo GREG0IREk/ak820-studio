@@ -6,6 +6,7 @@
 //   - menu : liste des entrées, la ligne choisie en vidéo inversée ;
 //   - réglage : valeur centrée, barre de caractères, pastille pour la couleur.
 // Maquette : firmware/maquettes/terminal.dc.html (pixels réels de l'écran).
+// Les petits textes sont en VT323 16 px : en dessous, « M » et « m » se confondent avec « N » et « n ».
 
 #include <stdio.h>
 #include <string.h>
@@ -16,7 +17,6 @@
 #include "res_terminal/term_big.qff.h"
 #include "res_terminal/term_mid.qff.h"
 #include "res_terminal/term_text.qff.h"
-#include "res_terminal/term_small.qff.h"
 
 // Couleurs (TSV 0-255, converties depuis la maquette)
 static const col_t BG    = {93, 85, 15};     // #0A0F0B fond
@@ -24,7 +24,7 @@ static const col_t PH    = {98, 158, 240};   // #5BF08A phosphore
 static const col_t TRACK = {98, 147, 78};    // #214E2F trait discret (28 % du phosphore)
 static const col_t DIM   = {98, 154, 139};   // #378B51 texte discret (55 %)
 
-// Marges de la maquette : 6 px en haut, 7 px sur les côtés.
+// Marges : 6 px en haut, 7 px sur les côtés (maquette), en retrait de 1 px pour les lignes du menu.
 #define MARGIN_X 7
 #define MARGIN_Y 6
 #define RIGHT_X  120   // dernier pixel de la zone utile (128 - 7 - 1)
@@ -35,9 +35,7 @@ static const col_t DIM   = {98, 154, 139};   // #378B51 texte discret (55 %)
 #define BAR_W  (BAR_X1 - BAR_X0 + 1)
 #define BAR_H  3
 
-#define ROW_H  15   // hauteur d'une ligne du menu
-
-static painter_font_handle_t f_huge, f_big, f_mid, f_text, f_small;
+static painter_font_handle_t f_huge, f_big, f_mid, f_text;
 
 // Ce qui est affiché, pour ne redessiner que ce qui change (-1 : rien d'affiché).
 static char    shown_conn[16], shown_time[8], shown_date[32], shown_value[24];
@@ -47,15 +45,15 @@ static void clear_all(void) {
     ui_fill(0, 0, UI_W - 1, UI_H - 1, BG);
 }
 
-// Hauteurs et positions verticales, dérivées des polices (la maquette sert de référence).
-static int16_t line1_y(void)  { return MARGIN_Y + f_small->line_height + 3; }   // trait sous l'en-tête
-static int16_t time_y(void)   { return line1_y() + 15; }
-static int16_t bar_y(void)    { return time_y() + 44; }
-static int16_t date_y(void)   { return bar_y() + 10; }
-static int16_t list_y(void)   { return line1_y() + 5; }                         // première ligne du menu
-static int16_t foot_y(void)   { return UI_H - MARGIN_Y - f_small->line_height; }
-static int16_t value_y(void)  { return line1_y() + 17; }                        // valeur du réglage
-static int16_t swatch_y(void) { return value_y() + f_big->line_height + 2; }
+// Positions verticales, dérivées des hauteurs de ligne des polices (VT323 : 17 px pour le texte).
+static int16_t line1_y(void)  { return MARGIN_Y + f_text->line_height + 1; }   // trait sous l'en-tête
+static int16_t time_y(void)   { return line1_y() + 8; }
+static int16_t bar_y(void)    { return time_y() + f_huge->line_height + 4; }   // barre des secondes
+static int16_t date_y(void)   { return bar_y() + BAR_H + 6; }
+static int16_t list_y(void)   { return line1_y() + 2; }                         // première ligne du menu
+static int16_t foot_y(void)   { return UI_H - MARGIN_Y - f_text->line_height; }
+static int16_t value_y(void)  { return line1_y() + 8; }                         // valeur du réglage
+static int16_t swatch_y(void) { return value_y() + f_big->line_height + 3; }
 
 // Majuscules pour le français : ASCII, et les lettres latines accentuées (U+00E0..U+00FE).
 static void to_upper_fr(char *dst, size_t n, const char *src) {
@@ -98,10 +96,10 @@ static void home_head(const ui_status_t *st) {
     if (st->battery == 0xFF) snprintf(bat, sizeof(bat), "BAT --%%");
     else snprintf(bat, sizeof(bat), "BAT %u%%", (unsigned)st->battery);
 
-    int16_t y = MARGIN_Y, lh = f_small->line_height;
+    int16_t y = MARGIN_Y, lh = f_text->line_height;
     ui_fill(MARGIN_X, y, RIGHT_X, y + lh - 1, BG);
-    ui_text(f_small, MARGIN_X, y, conn, PH, BG);
-    ui_text_right(f_small, RIGHT_X, y, bat, PH, BG);
+    ui_text(f_text, MARGIN_X, y, conn, PH, BG);
+    ui_text_right(f_text, RIGHT_X, y, bat, PH, BG);
 }
 
 // Barre des secondes : la partie remplie suit sec / 59.
@@ -134,7 +132,7 @@ static void home_date(const rtc_time_t *t) {
     to_upper_fr(up, sizeof(up), buf);
     if (strcmp(up, shown_date) == 0) return;
     strcpy(shown_date, up);
-    ui_text_center(f_small, date_y(), MARGIN_X, RIGHT_X, up, PH, BG);
+    ui_text_center(f_text, date_y(), MARGIN_X, RIGHT_X, up, PH, BG);
 }
 
 // Pied : « MAJ » à gauche (vidéo inversée si Verr. Maj), nom court de l'effet à droite.
@@ -144,20 +142,20 @@ static void home_foot(bool caps, uint8_t eff) {
     shown_caps = c;
     shown_eff  = eff;
 
-    int16_t y = foot_y(), lh = f_small->line_height;
-    int16_t w = ui_text_width(f_small, "MAJ");
+    int16_t y = foot_y(), lh = f_text->line_height;
+    int16_t w = ui_text_width(f_text, "MAJ");
     ui_fill(MARGIN_X, y, RIGHT_X, y + lh - 1, BG);
     if (caps) {
         // Fond phosphore avec 2 px de marge de chaque côté du texte.
         ui_fill(MARGIN_X, y, MARGIN_X + 2 + w + 2 - 1, y + lh - 1, PH);
-        ui_text(f_small, MARGIN_X + 2, y, "MAJ", BG, PH);
+        ui_text(f_text, MARGIN_X + 2, y, "MAJ", BG, PH);
     } else {
-        ui_text(f_small, MARGIN_X + 2, y, "MAJ", DIM, BG);
+        ui_text(f_text, MARGIN_X + 2, y, "MAJ", DIM, BG);
     }
 
     char up[16];
     to_upper_fr(up, sizeof(up), ui_effect_short(eff));
-    ui_text_right(f_small, RIGHT_X, y, up, PH, BG);
+    ui_text_right(f_text, RIGHT_X, y, up, PH, BG);
 }
 
 static void home_draw(bool full) {
@@ -182,36 +180,35 @@ static void home_draw(bool full) {
 // ---------------------------------------------------------------------------
 // Menu
 
-// Une ligne du menu : « > » devant l'entrée choisie, libellé à gauche, valeur courte à droite.
+// Une ligne du menu : libellé à gauche, valeur courte à droite. La ligne choisie est en vidéo inversée.
 static void menu_row(uint8_t i, bool sel) {
-    int16_t y  = list_y() + i * ROW_H;
+    int16_t y  = list_y() + i * f_text->line_height;
+    int16_t h  = f_text->line_height;
     col_t   bg = sel ? PH : BG;
     col_t   fg = sel ? BG : PH;
     col_t   vg = sel ? BG : DIM;
 
-    char label[32], val[20];
-    snprintf(label, sizeof(label), "%s%s", sel ? "> " : "  ", UI_ITEM_LABEL[i]);
+    char val[20];
     ui_value_text(i, val, sizeof(val), true);
 
-    int16_t ty = y + (ROW_H - (int16_t)f_text->line_height) / 2;
-    ui_fill(MARGIN_X, y, RIGHT_X, y + ROW_H - 1, bg);
-    ui_text(f_text, MARGIN_X + 3, ty, label, fg, bg);
-    ui_text_right(f_text, RIGHT_X - 3, ty, val, vg, bg);
+    ui_fill(MARGIN_X, y, RIGHT_X, y + h - 1, bg);
+    ui_text(f_text, MARGIN_X + 1, y, UI_ITEM_LABEL[i], fg, bg);
+    ui_text_right(f_text, RIGHT_X - 1, y, val, vg, bg);
 }
 
 // Position « n/6 » à droite de l'en-tête.
 static void menu_pos(uint8_t sel) {
     char pos[8];
     snprintf(pos, sizeof(pos), "%u/%u", (unsigned)sel + 1, (unsigned)IT_COUNT);
-    ui_fill(90, MARGIN_Y, RIGHT_X, MARGIN_Y + f_small->line_height - 1, BG);
-    ui_text_right(f_small, RIGHT_X, MARGIN_Y, pos, DIM, BG);
+    ui_fill(90, MARGIN_Y, RIGHT_X, MARGIN_Y + f_text->line_height - 1, BG);
+    ui_text_right(f_text, RIGHT_X, MARGIN_Y, pos, DIM, BG);
 }
 
 static void menu_draw(bool full) {
     uint8_t sel = ui.sel;
     if (full) {
         clear_all();
-        ui_text(f_small, MARGIN_X, MARGIN_Y, "> MENU", PH, BG);
+        ui_text(f_text, MARGIN_X, MARGIN_Y, "> MENU", PH, BG);
         ui_fill(MARGIN_X, line1_y(), RIGHT_X, line1_y(), TRACK);
         for (uint8_t i = 0; i < IT_COUNT; i++) menu_row(i, i == sel);
     } else if (sel == shown_sel) {
@@ -235,7 +232,7 @@ static void edit_value(void) {
     strcpy(shown_value, buf);
 
     // Les nombres en grand ; un nom d'effet ou d'interface, ou un texte trop large, en moyen.
-    bool                  big = ui.sel != IT_EFFECT && ui.sel != IT_THEME && ui_text_width(f_big, buf) <= RIGHT_X - MARGIN_X - 6;
+    bool                  big = ui.sel != IT_EFFECT && ui.sel != IT_THEME && ui_text_width(f_big, buf) <= RIGHT_X - MARGIN_X - 8;
     painter_font_handle_t f   = big ? f_big : f_mid;
     int16_t               y   = big ? value_y() : value_y() + (f_big->line_height - f_mid->line_height) / 2;
 
@@ -251,6 +248,10 @@ static void edit_swatch(void) {
 }
 
 // Barre « [######....] » de 10 cases.
+static int16_t edit_bar_y(void) {
+    return ui.sel == IT_HUE ? swatch_y() + 6 + 6 : value_y() + f_big->line_height + 8;
+}
+
 static void edit_bar(void) {
     int16_t n = (ui_value_permille(ui.sel) + 50) / 100;
     if (n > 10) n = 10;
@@ -263,8 +264,7 @@ static void edit_bar(void) {
     bar[11] = ']';
     bar[12] = 0;
 
-    int16_t y = ui.sel == IT_HUE ? swatch_y() + 6 + 8 : value_y() + f_big->line_height + 8;
-    ui_text_center(f_text, y, MARGIN_X, RIGHT_X, bar, PH, BG);
+    ui_text_center(f_text, edit_bar_y(), MARGIN_X, RIGHT_X, bar, PH, BG);
 }
 
 static void edit_draw(bool full) {
@@ -274,10 +274,10 @@ static void edit_draw(bool full) {
         char up[24], head[32];
         to_upper_fr(up, sizeof(up), UI_ITEM_LABEL[sel]);
         snprintf(head, sizeof(head), "> %s", up);
-        ui_text(f_small, MARGIN_X, MARGIN_Y, head, PH, BG);
+        ui_text(f_text, MARGIN_X, MARGIN_Y, head, PH, BG);
         ui_fill(MARGIN_X, line1_y(), RIGHT_X, line1_y(), TRACK);
-        ui_text(f_small, MARGIN_X, foot_y() - f_small->line_height, "MOLETTE  RÉGLER", DIM, BG);
-        ui_text(f_small, MARGIN_X, foot_y(), "APPUI    VALIDER", DIM, BG);
+        // Une seule ligne d'aide : deux lignes ne tiennent pas en 16 px.
+        ui_text(f_text, MARGIN_X, foot_y(), "APPUI : VALIDER", DIM, BG);
         shown_value[0] = 0;
         shown_hue = shown_bar_n = -1;
     }
@@ -289,11 +289,10 @@ static void edit_draw(bool full) {
 // ---------------------------------------------------------------------------
 
 static void enter(void) {
-    f_huge  = qp_load_font_mem(font_term_huge);
-    f_big   = qp_load_font_mem(font_term_big);
-    f_mid   = qp_load_font_mem(font_term_mid);
-    f_text  = qp_load_font_mem(font_term_text);
-    f_small = qp_load_font_mem(font_term_small);
+    f_huge = qp_load_font_mem(font_term_huge);
+    f_big  = qp_load_font_mem(font_term_big);
+    f_mid  = qp_load_font_mem(font_term_mid);
+    f_text = qp_load_font_mem(font_term_text);
 }
 
 static void leave(void) {
@@ -301,7 +300,6 @@ static void leave(void) {
     qp_close_font(f_big);
     qp_close_font(f_mid);
     qp_close_font(f_text);
-    qp_close_font(f_small);
 }
 
 static void draw(ui_screen_t screen, bool full) {
