@@ -122,10 +122,19 @@ static void home_clock(const char *hhmm, const char *date, bool caps) {
     }
 }
 
+// Libellé (police fine) puis valeur (police grasse) dans une tuile de deux
+// lignes : le bloc est centré verticalement, tout le texte reste dans la tuile.
+// Renvoie le haut du libellé ; la valeur est à `top + f_small->line_height + 2`.
+static int16_t two_lines_top(int16_t y0, int16_t y1) {
+    int16_t h = f_small->line_height + 2 + f_bold->line_height;
+    return y0 + (y1 - y0 + 1 - h) / 2;
+}
+
 static void battery_tile(uint8_t bat) {
     tile(4, 68, 61, 95, TILE);
-    ui_text(f_small, 10, 71, "Batterie", SUB, TILE);
-    int16_t vy = 71 + f_small->line_height + 2;
+    int16_t top = two_lines_top(68, 95);
+    ui_text(f_small, 10, top, "Batterie", SUB, TILE);
+    int16_t vy = top + f_small->line_height + 2;
 
     char buf[8];
     if (bat == 0xFF) snprintf(buf, sizeof(buf), "-- %%");
@@ -148,8 +157,9 @@ static void conn_text(const ui_status_t *st, char *buf, size_t n) {
 
 static void conn_tile(const char *txt) {
     tile(66, 68, 123, 95, TILE);
-    ui_text(f_small, 72, 71, "Connexion", SUB, TILE);
-    ui_text(f_bold, 72, 71 + f_small->line_height + 2, txt, TEXT, TILE);
+    int16_t top = two_lines_top(68, 95);
+    ui_text(f_small, 72, top, "Connexion", SUB, TILE);
+    ui_text(f_bold, 72, top + f_small->line_height + 2, txt, TEXT, TILE);
 }
 
 // Couleur de la pastille : gris pour « Éteint », orange pour « Arc-en-ciel ».
