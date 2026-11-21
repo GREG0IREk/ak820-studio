@@ -45,12 +45,14 @@ static void clear_all(void) {
     ui_fill(0, 0, UI_W - 1, UI_H - 1, BG);
 }
 
-// Positions verticales, dérivées des hauteurs de ligne des polices (VT323 : 17 px pour le texte).
+// Positions verticales, dérivées des hauteurs de ligne des polices (VT323 : 18 px pour le texte).
 static int16_t line1_y(void)  { return MARGIN_Y + f_text->line_height + 1; }   // trait sous l'en-tête
 static int16_t time_y(void)   { return line1_y() + 8; }
 static int16_t bar_y(void)    { return time_y() + f_huge->line_height + 4; }   // barre des secondes
 static int16_t date_y(void)   { return bar_y() + BAR_H + 6; }
-static int16_t list_y(void)   { return line1_y() + 2; }                         // première ligne du menu
+// Menu : en-tête remonté à 2 px, sans trait, pour que six lignes de 18 px tiennent dans 128 px.
+#define MENU_TOP 2
+static int16_t menu_list_y(void) { return MENU_TOP + f_text->line_height; }
 static int16_t foot_y(void)   { return UI_H - MARGIN_Y - f_text->line_height; }
 static int16_t value_y(void)  { return line1_y() + 8; }                         // valeur du réglage
 static int16_t swatch_y(void) { return value_y() + f_big->line_height + 3; }
@@ -182,7 +184,7 @@ static void home_draw(bool full) {
 
 // Une ligne du menu : libellé à gauche, valeur courte à droite. La ligne choisie est en vidéo inversée.
 static void menu_row(uint8_t i, bool sel) {
-    int16_t y  = list_y() + i * f_text->line_height;
+    int16_t y  = menu_list_y() + i * f_text->line_height;
     int16_t h  = f_text->line_height;
     col_t   bg = sel ? PH : BG;
     col_t   fg = sel ? BG : PH;
@@ -200,16 +202,15 @@ static void menu_row(uint8_t i, bool sel) {
 static void menu_pos(uint8_t sel) {
     char pos[8];
     snprintf(pos, sizeof(pos), "%u/%u", (unsigned)sel + 1, (unsigned)IT_COUNT);
-    ui_fill(90, MARGIN_Y, RIGHT_X, MARGIN_Y + f_text->line_height - 1, BG);
-    ui_text_right(f_text, RIGHT_X, MARGIN_Y, pos, DIM, BG);
+    ui_fill(90, MENU_TOP, RIGHT_X, MENU_TOP + f_text->line_height - 1, BG);
+    ui_text_right(f_text, RIGHT_X, MENU_TOP, pos, DIM, BG);
 }
 
 static void menu_draw(bool full) {
     uint8_t sel = ui.sel;
     if (full) {
         clear_all();
-        ui_text(f_text, MARGIN_X, MARGIN_Y, "> MENU", PH, BG);
-        ui_fill(MARGIN_X, line1_y(), RIGHT_X, line1_y(), TRACK);
+        ui_text(f_text, MARGIN_X, MENU_TOP, "> MENU", PH, BG);
         for (uint8_t i = 0; i < IT_COUNT; i++) menu_row(i, i == sel);
     } else if (sel == shown_sel) {
         return;
