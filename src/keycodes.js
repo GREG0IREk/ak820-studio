@@ -25,8 +25,8 @@ export const MOUSE = [
   [1, 'Clic gauche'], [2, 'Clic droit'], [4, 'Clic milieu'], [8, 'Bouton 4 (précédent)'], [16, 'Bouton 5 (suivant)'],
 ];
 
-/** Libellé lisible d'une action, selon la disposition choisie. */
-export function actionLabel(a, hidLabels) {
+/** Libellé lisible d'une action, selon la disposition choisie (macroName : nom de la macro n). */
+export function actionLabel(a, hidLabels, macroName) {
   if (!a) return '';
   switch (a.kind) {
     case 'default': return 'Par défaut';
@@ -42,7 +42,7 @@ export function actionLabel(a, hidLabels) {
       const m = MOUSE.find(([u]) => u === a.button);
       return m ? m[1] : `Souris ${a.button}`;
     }
-    case 'qmk': return qmkKeyLabel(a.code, (u) => hidLabels.get(u) || (EXTRA_KEYS.find(([x]) => x === u) || [])[1]);
+    case 'qmk': return qmkKeyLabel(a.code, (u) => hidLabels.get(u) || (EXTRA_KEYS.find(([x]) => x === u) || [])[1], macroName);
     default: return `Code ${a.bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ')}`;
   }
 }

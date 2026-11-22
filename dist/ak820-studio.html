@@ -249,6 +249,8 @@ input[type='search'] { width: 100%; min-height: 38px; padding: 0 12px; border-ra
 .icon-btn:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
 .icon-btn:disabled { opacity: 0.35; cursor: default; }
 .mc-keys { max-height: 260px; overflow: auto; margin-top: 10px; padding-right: 4px; }
+#mc-name { flex: 1 1 160px; min-width: 0; min-height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
+#mc-add { width: 100%; justify-content: center; }
 @media (max-width: 860px) {
   .macro-grid { grid-template-columns: minmax(0, 1fr); }
   .macro-list { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
@@ -478,12 +480,13 @@ dialog p { color: var(--muted); margin: 0 0 18px; }
     <!-- Macros -->
     <section class="view" id="view-macros">
       <h1>Macros</h1>
-      <p class="lead">Huit suites de touches, envoyées d'un coup. Affectez une macro à une touche dans Touches.</p>
+      <p class="lead">Jusqu'à huit suites de touches et de clics, envoyées d'un coup. Affectez une macro à une touche dans Touches.</p>
       <div id="macros-unsupported" class="banner hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span id="macros-unsupported-text"></span></div>
       <div class="macro-grid" id="macros-body">
         <div class="card">
           <div class="macro-list" id="mc-list" role="radiogroup" aria-label="Macros"></div>
-          <div class="field">
+          <button class="btn" id="mc-add" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Ajouter une macro</button>
+          <div class="field" style="margin-top: 16px;">
             <div class="label">Octets utilisés</div>
             <div class="meter"><div id="mc-meter"></div></div>
             <p class="note" id="mc-usage"></p>
@@ -493,6 +496,15 @@ dialog p { color: var(--muted); margin: 0 0 18px; }
           <div class="row" style="justify-content: space-between; margin-bottom: 12px;">
             <h2 id="mc-title">Macro 1</h2>
             <span class="note" id="mc-count"></span>
+          </div>
+          <div class="field row">
+            <label for="mc-name" class="note">Nom</label>
+            <input type="text" id="mc-name" maxlength="32" autocomplete="off" placeholder="Macro 1">
+            <span class="note">Noms gardés sur cet ordinateur.</span>
+          </div>
+          <div class="row" style="margin-bottom: 12px;">
+            <button class="btn" id="mc-clear" type="button">Vider</button>
+            <button class="btn hidden" id="mc-remove" type="button">Supprimer</button>
           </div>
           <ol class="steps" id="mc-steps"></ol>
           <div class="field row">
@@ -792,32 +804,41 @@ const QMK_KEYBOARD = [
   [0x7c00, 'Mode flash'], [KC_TRNS, 'Transparent (couche du dessous)'], [KC_NO, 'Aucune action'],
 ];
 
+/** Boutons et molette de la souris (QK_MOUSE_* de quantum/keycodes.h, firmware Cadran). */
+const QMK_MOUSE = [
+  [0x00d1, 'Clic gauche'], [0x00d2, 'Clic droit'], [0x00d3, 'Clic milieu'],
+  [0x00d9, 'Molette haut'], [0x00da, 'Molette bas'],
+];
+
 const MOD_NAMES = [[0x01, 'Ctrl'], [0x02, 'Maj'], [0x04, 'Alt'], [0x08, 'Win']];
 /** Code de base HID (0x04-0xA4, modificateurs 0xE0-0xE7) : même valeur que l'usage HID. */
 const isBasicHid = (code) => (code >= 0x04 && code <= 0xa4) || (code >= 0xe0 && code <= 0xe7);
 
-/** Libellé d'un code QMK ; hidLabel(code) donne le nom d'une touche de base dans la disposition choisie. */
-function qmkKeyLabel(code, hidLabel) {
+/**
+ * Libellé d'un code QMK ; hidLabel(code) donne le nom d'une touche de base dans la disposition
+ * choisie, macroName(n) le nom de la macro n (0 à 7), « Macro n » par défaut.
+ */
+function qmkKeyLabel(code, hidLabel, macroName = (n) => `Macro ${n + 1}`) {
   if (isBasicHid(code)) return hidLabel(code) || `HID 0x${code.toString(16)}`;
-  const named = [...QMK_MEDIA, ...QMK_LIGHTING, ...QMK_KEYBOARD].find(([c]) => c === code);
+  const named = [...QMK_MEDIA, ...QMK_LIGHTING, ...QMK_KEYBOARD, ...QMK_MOUSE].find(([c]) => c === code);
   if (named) return named[1];
   if (code >= 0x0100 && code <= 0x1fff) {
     const mods = (code >> 8) & 0x1f, base = code & 0xff;
     const names = MOD_NAMES.filter(([m]) => mods & m).map(([, n]) => (mods & 0x10 ? n + ' d.' : n));
-    return [...names, qmkKeyLabel(base, hidLabel)].join('+');
+    return [...names, qmkKeyLabel(base, hidLabel, macroName)].join('+');
   }
-  if (code >= QK_MACRO && code < QK_MACRO + Q_MACRO_COUNT) return `Macro ${code - QK_MACRO + 1}`;
+  if (code >= QK_MACRO && code < QK_MACRO + Q_MACRO_COUNT) return macroName(code - QK_MACRO);
   if (code >= 0x5220 && code <= 0x523f) return `Couche ${code & 0x1f} (maintenue)`;
   if (code >= 0x5260 && code <= 0x527f) return `Couche ${code & 0x1f} (bascule)`;
   return `Code 0x${code.toString(16).padStart(4, '0')}`;
 }
 
-return { FAMILY_Q, PAGE_RAW, USAGE_RAW, Q_REPORT, Q_SET, Q_REFUSED, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SYS_VERSION, Q_KEYMAP_CHUNK, Q_PERKEY_CHUNK, Q_MACRO_CHUNK, QK_MACRO, Q_MACRO_COUNT, qFrame, qClockArgs, qParseInfo, qString, Q_LAYERS, Q_ROWS, Q_COLS, SLOT_MATRIX, Q_LED_COUNT, SLOT_LED, qDecodeLayer, rgbToHsv8, hsv8ToRgb, colorName, qEffectInfo, KC_NO, KC_TRNS, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, isBasicHid, qmkKeyLabel };
+return { FAMILY_Q, PAGE_RAW, USAGE_RAW, Q_REPORT, Q_SET, Q_REFUSED, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SYS_VERSION, Q_KEYMAP_CHUNK, Q_PERKEY_CHUNK, Q_MACRO_CHUNK, QK_MACRO, Q_MACRO_COUNT, qFrame, qClockArgs, qParseInfo, qString, Q_LAYERS, Q_ROWS, Q_COLS, SLOT_MATRIX, Q_LED_COUNT, SLOT_LED, qDecodeLayer, rgbToHsv8, hsv8ToRgb, colorName, qEffectInfo, KC_NO, KC_TRNS, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, QMK_MOUSE, isBasicHid, qmkKeyLabel };
 })();
 
 // ---- protocol.js
 __mod.protocol = (() => {
-const { FAMILY_Q, PAGE_RAW, USAGE_RAW, Q_REPORT, Q_REFUSED, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SYS_VERSION, Q_KEYMAP_CHUNK, Q_PERKEY_CHUNK, Q_LAYERS, SLOT_MATRIX, SLOT_LED, qFrame, qClockArgs, qParseInfo, qString, qDecodeLayer, qEffectInfo, rgbToHsv8, hsv8ToRgb, Q_MACRO_CHUNK, } = __mod.qmk;
+const { FAMILY_Q, PAGE_RAW, USAGE_RAW, Q_REPORT, Q_REFUSED, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SYS_VERSION, Q_KEYMAP_CHUNK, Q_PERKEY_CHUNK, Q_LAYERS, SLOT_MATRIX, SLOT_LED, qFrame, qClockArgs, qParseInfo, qString, qDecodeLayer, qEffectInfo, rgbToHsv8, hsv8ToRgb, Q_MACRO_CHUNK, Q_MACRO_COUNT, QMK_MOUSE, } = __mod.qmk;
 // Protocole HID de l'Ajazz / Epomaker AK820 Pro.
 //
 // Porté depuis wsclx/ak820pro-modder (MIT), crates/ak820-protocol :
@@ -1059,9 +1080,11 @@ const M_ESC = 0x01, M_TAP = 0x01, M_DOWN = 0x02, M_UP = 0x03, M_DELAY = 0x04, M_
 const MOD_CODES = [[0x01, 0xe0], [0x02, 0xe1], [0x04, 0xe2], [0x08, 0xe3]];
 const MACRO_MAX_DELAY = 9999;
 
-const isMacroKey = (k) => (k >= 0x04 && k <= 0xa4) || (k >= 0xe0 && k <= 0xe7);
+/** Codes de souris QMK utilisables comme étape : clic gauche, droit, milieu, molette haut et bas. */
+const MOUSE_STEP_CODES = QMK_MOUSE.map(([code]) => code);
+const isMacroKey = (k) => (k >= 0x04 && k <= 0xa4) || (k >= 0xe0 && k <= 0xe7) || MOUSE_STEP_CODES.includes(k);
 
-/** Étape -> octets. Lève une erreur si la touche ou le délai sont hors plage. */
+/** Étape -> octets. Touche : code HID (clavier) ou code de souris QMK (clic, molette). Lève une erreur si la touche ou le délai sont hors plage. */
 function encodeMacroStep({ mods = 0, key, delay = 0 }) {
   if (!Number.isInteger(key) || !isMacroKey(key)) throw new Error(`Touche hors plage : ${key}`);
   if (!Number.isInteger(delay) || delay < 0 || delay > MACRO_MAX_DELAY) throw new Error(`Délai hors plage (0 à ${MACRO_MAX_DELAY} ms) : ${delay}`);
@@ -1126,6 +1149,16 @@ function decodeMacro(bytes) {
     i = r.next;
   }
   return { steps, tail: b.slice(i) };
+}
+
+/**
+ * Nombre de macros affichées : au moins une, jusqu'à la dernière non vide, et le nombre mémorisé
+ * (plafonné à Q_MACRO_COUNT).
+ */
+function macrosShown(list, remembered = 1) {
+  let last = -1;
+  list.forEach((m, n) => { if (m.steps.length || m.tail.length) last = n; });
+  return Math.min(Q_MACRO_COUNT, Math.max(1, last + 1, Number(remembered) || 1));
 }
 
 /** Octets qu'occupe une liste de macros, séparateurs 00 compris. */
@@ -1920,7 +1953,7 @@ class Keyboard {
   }
 }
 
-return { VENDOR_ID, PRODUCT_IDS, CONTROL_USAGE_PAGES, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, FAMILY_A, FAMILY_B, PACKET_LEN, HEADER_LEN, PAYLOAD_PER_PACKET, CMD, buildFrame, MODES, MODE_CUSTOM, DIRECTION, supportedDirections, parseHex, ledEffectPayload, parseDeviceInfo, SLEEP_A, SLEEP_B, clockPayload, LED_COUNT, encodeCustomLeds, decodeCustomLeds, KEYMAP_BYTES, PAGE, decodeKeyAction, encodeKeyAction, decodeKeymap, encodeKeymap, MACRO_MAX_DELAY, encodeMacroStep, encodeMacro, decodeMacro, macroUsage, buildMacroBuffer, parseMacroBuffer, TFT_SIZE, FRAME_BYTES, TFT_HEADER_BYTES, rgb565, rgbaToRgb565, encodeAnimationA, tftChunkHeader, LEGACY_CHUNK, LEGACY_MAX_FRAMES, encodeAnimationB, B, controlPacket, legacyLightingPacket, legacySleepPacket, legacyClockPacket, ANSI_LED_SLOTS, legacyEncodeBank, encodeKeyActionB, legacyEncodeKeymap, LEGACY_KEY_SLOTS, defaultKeymap, legacyCustomModePacket, parseLegacyBattery, reportBytes, classify, sleep, Endpoint, Keyboard };
+return { VENDOR_ID, PRODUCT_IDS, CONTROL_USAGE_PAGES, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, FAMILY_A, FAMILY_B, PACKET_LEN, HEADER_LEN, PAYLOAD_PER_PACKET, CMD, buildFrame, MODES, MODE_CUSTOM, DIRECTION, supportedDirections, parseHex, ledEffectPayload, parseDeviceInfo, SLEEP_A, SLEEP_B, clockPayload, LED_COUNT, encodeCustomLeds, decodeCustomLeds, KEYMAP_BYTES, PAGE, decodeKeyAction, encodeKeyAction, decodeKeymap, encodeKeymap, MACRO_MAX_DELAY, encodeMacroStep, encodeMacro, decodeMacro, macrosShown, macroUsage, buildMacroBuffer, parseMacroBuffer, TFT_SIZE, FRAME_BYTES, TFT_HEADER_BYTES, rgb565, rgbaToRgb565, encodeAnimationA, tftChunkHeader, LEGACY_CHUNK, LEGACY_MAX_FRAMES, encodeAnimationB, B, controlPacket, legacyLightingPacket, legacySleepPacket, legacyClockPacket, ANSI_LED_SLOTS, legacyEncodeBank, encodeKeyActionB, legacyEncodeKeymap, LEGACY_KEY_SLOTS, defaultKeymap, legacyCustomModePacket, parseLegacyBattery, reportBytes, classify, sleep, Endpoint, Keyboard };
 })();
 
 // ---- layouts.js
@@ -2029,8 +2062,8 @@ const MOUSE = [
   [1, 'Clic gauche'], [2, 'Clic droit'], [4, 'Clic milieu'], [8, 'Bouton 4 (précédent)'], [16, 'Bouton 5 (suivant)'],
 ];
 
-/** Libellé lisible d'une action, selon la disposition choisie. */
-function actionLabel(a, hidLabels) {
+/** Libellé lisible d'une action, selon la disposition choisie (macroName : nom de la macro n). */
+function actionLabel(a, hidLabels, macroName) {
   if (!a) return '';
   switch (a.kind) {
     case 'default': return 'Par défaut';
@@ -2046,7 +2079,7 @@ function actionLabel(a, hidLabels) {
       const m = MOUSE.find(([u]) => u === a.button);
       return m ? m[1] : `Souris ${a.button}`;
     }
-    case 'qmk': return qmkKeyLabel(a.code, (u) => hidLabels.get(u) || (EXTRA_KEYS.find(([x]) => x === u) || [])[1]);
+    case 'qmk': return qmkKeyLabel(a.code, (u) => hidLabels.get(u) || (EXTRA_KEYS.find(([x]) => x === u) || [])[1], macroName);
     default: return `Code ${a.bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ')}`;
   }
 }
@@ -2168,6 +2201,8 @@ const MACRO_SIZE = 512;
 const DEMO_MACROS = [
   { steps: [{ mods: 1, key: 0x06, delay: 50 }, { mods: 1, key: 0x19, delay: 0 }], tail: [] },
   { steps: [{ mods: 0, key: 0x1e, delay: 100 }, { mods: 0, key: 0x1f, delay: 100 }, { mods: 0, key: 0x20, delay: 0 }], tail: [] },
+  /** Clic gauche, puis molette bas avec Ctrl maintenu. */
+  { steps: [{ mods: 0, key: 0xd1, delay: 100 }, { mods: 1, key: 0xda, delay: 0 }], tail: [] },
 ];
 
 class FakeDevice extends EventTarget {
@@ -2379,13 +2414,13 @@ return { SCREEN_PREVIEWS };
 
 // ---- app.js
 __mod.app = (() => {
-const { VENDOR_ID, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, CONTROL_USAGE_PAGES, FAMILY_A, MODES, supportedDirections, classify, Keyboard, TFT_SIZE, LEGACY_MAX_FRAMES, parseHex, defaultKeymap, macroUsage, encodeMacro, } = __mod.protocol;
+const { VENDOR_ID, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, CONTROL_USAGE_PAGES, FAMILY_A, MODES, supportedDirections, classify, Keyboard, TFT_SIZE, LEGACY_MAX_FRAMES, parseHex, defaultKeymap, macroUsage, encodeMacro, macrosShown, } = __mod.protocol;
 const { LAYOUTS } = __mod.layouts;
 const { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } = __mod.keycodes;
 const { decodeFile, renderFrame, toPixels } = __mod.image;
 const { mockFamilyA, mockFamilyB, mockFamilyQ } = __mod.mock;
 const { SCREEN_PREVIEWS } = __mod.ecrans;
-const { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid, colorName, QK_MACRO } = __mod.qmk;
+const { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, QMK_MOUSE, KC_TRNS, SLOT_MATRIX, isBasicHid, colorName, QK_MACRO, Q_MACRO_COUNT } = __mod.qmk;
 // Interface d'AK820 Studio.
 
 
@@ -2527,7 +2562,7 @@ const state = {
   pkBrightness: store.get('pkBrightness', 5),
   tft: { frames: [], fileName: '', opts: store.get('tftOpts', { fit: 'cover', zoom: 1, offsetX: 0, offsetY: 0, background: '#000000', speed: 1 }), encoded: [] },
   km: { layer: 'base', device: {}, draft: {}, factory: {}, selected: null, testing: false },
-  mc: { loaded: false, list: [], sel: 0, mods: 0, dirty: false },
+  mc: { loaded: false, list: [], sel: 0, mods: 0, dirty: false, names: normNames(store.get('macroNames', [])) },
   logOn: false,
   log: [],
 };
@@ -2956,8 +2991,8 @@ function renderKeymap() {
     const isDefault = isQ() ? !a || !fac || sameAction(a, fac[k.slot]) : !a || a.kind === 'default' || (a.kind === 'keyboard' && a.usage === k.hid);
     const diff = draft && dev && !sameAction(a, dev[k.slot]);
     if (diff) changed++;
-    if (isQ()) el.firstChild.textContent = !a ? k.label : a.code === KC_TRNS ? '' : actionLabel(a, labels);
-    else el.firstChild.textContent = isDefault ? k.label : actionLabel(a, labels);
+    if (isQ()) el.firstChild.textContent = !a ? k.label : a.code === KC_TRNS ? '' : actionLabel(a, labels, macroName);
+    else el.firstChild.textContent = isDefault ? k.label : actionLabel(a, labels, macroName);
     el.classList.toggle('mod', !isDefault);
     el.classList.toggle('sel', state.km.selected === k.slot);
     el.classList.toggle('na', !keyRemappable(k.slot));
@@ -2981,11 +3016,11 @@ function renderPicker() {
   const fac = state.km.factory[L];
   const q = (list) => list.map(([c, l]) => [{ kind: 'qmk', code: c }, l]);
   const groups = isQ() ? [
-    ['Origine', fac && fac[slot] ? [[fac[slot], `${fac[slot].code === KC_TRNS ? 'Transparent' : actionLabel(fac[slot], labels)} (origine)`]] : []],
+    ['Origine', fac && fac[slot] ? [[fac[slot], `${fac[slot].code === KC_TRNS ? 'Transparent' : actionLabel(fac[slot], labels, macroName)} (origine)`]] : []],
     ['Touches du clavier', q([...labels])],
     ['Autres touches', q(EXTRA_KEYS)],
     ['Multimédia', q(QMK_MEDIA)],
-    ['Macros', state.kb.caps.macros ? q(Array.from({ length: state.kb.caps.macros.count }, (_, n) => [QK_MACRO + n, `Macro ${n + 1}`])) : []],
+    ['Macros', state.kb.caps.macros ? q(Array.from({ length: shownMacros() }, (_, n) => [QK_MACRO + n, macroName(n)])) : []],
     ['Éclairage', q(QMK_LIGHTING)],
     ['Clavier', q(QMK_KEYBOARD)],
   ] : [
@@ -3019,6 +3054,20 @@ const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICON_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 const ICON_REMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
+/** Noms de macros : huit chaînes, vides pour « Macro n ». */
+function normNames(a) {
+  return Array.from({ length: Q_MACRO_COUNT }, (_, n) => (Array.isArray(a) && typeof a[n] === 'string' ? a[n].trim().slice(0, 32) : ''));
+}
+function saveMacroNames(names) {
+  state.mc.names = names;
+  store.set('macroNames', names);
+}
+/** Nom affiché d'une macro : celui qu'on lui a donné, sinon « Macro n ». */
+const macroName = (n) => state.mc.names[n] || `Macro ${n + 1}`;
+/** Nombre de macros affichées (voir macrosShown dans protocol.js). */
+const shownMacros = () => macrosShown(state.mc.list, store.get('macroShown', 1));
+const emptyMacro = () => ({ steps: [], tail: [] });
+
 function initMacros() {
   $$('#mc-mods button').forEach((b) => (b.onclick = () => { state.mc.mods ^= +b.dataset.mod; renderMacros(); }));
   $('#mc-search').oninput = renderMacroKeys;
@@ -3032,6 +3081,31 @@ function initMacros() {
     state.mc.dirty = false;
     renderMacros();
   }, 'Macros envoyées au clavier');
+  $('#mc-add').onclick = () => {
+    const n = shownMacros();
+    if (n >= Q_MACRO_COUNT) return;
+    store.set('macroShown', n + 1);
+    state.mc.sel = n;
+    renderMacros();
+  };
+  $('#mc-clear').onclick = () => mcEdit((all) => { all[state.mc.sel] = emptyMacro(); });
+  // Seule la dernière macro affichée se supprime : elle est vidée et masquée.
+  $('#mc-remove').onclick = () => {
+    const n = shownMacros(), sel = state.mc.sel;
+    if (n < 2 || sel !== n - 1) return;
+    const names = state.mc.names.slice();
+    names[sel] = '';
+    saveMacroNames(names);
+    store.set('macroShown', n - 1);
+    state.mc.sel = n - 2;
+    mcEdit((all) => { all[sel] = emptyMacro(); });
+  };
+  $('#mc-name').onchange = (e) => {
+    const names = state.mc.names.slice();
+    names[state.mc.sel] = e.target.value.trim().slice(0, 32);
+    saveMacroNames(names);
+    renderMacros();
+  };
 }
 
 /** Délai saisi -> entier entre 0 et 9999 ms ; null si la saisie est vide ou non numérique. */
@@ -3064,7 +3138,8 @@ function mcEdit(fn) {
 
 function stepLabel(s) {
   const mods = MOD_LABELS.filter(([bit]) => s.mods & bit).map(([, n]) => n);
-  return [...mods, actionLabel({ kind: 'keyboard', usage: s.key }, hidLabels())].join('+');
+  const mouse = QMK_MOUSE.find(([code]) => code === s.key);
+  return [...mods, mouse ? mouse[1] : actionLabel({ kind: 'keyboard', usage: s.key }, hidLabels())].join('+');
 }
 
 function macroTool(html, label, disabled, fn) {
@@ -3091,20 +3166,23 @@ function renderMacros() {
     return;
   }
   if (!state.mc.loaded) return;
-  const { list, sel } = state.mc;
+  const { list } = state.mc;
+  const shown = shownMacros();
+  if (state.mc.sel >= shown) state.mc.sel = shown - 1;
+  const sel = state.mc.sel;
   const size = kb.caps.macros.size, used = macroUsage(list);
 
   // Liste des macros
   const box = $('#mc-list');
   box.innerHTML = '';
-  list.forEach((m, n) => {
+  list.slice(0, shown).forEach((m, n) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'mc-item';
     b.setAttribute('aria-pressed', String(n === sel));
     const name = document.createElement('span');
     name.className = 'mc-name';
-    name.textContent = `Macro ${n + 1}`;
+    name.textContent = macroName(n);
     const info = document.createElement('span');
     info.className = 'note';
     const count = m.steps.length;
@@ -3113,6 +3191,8 @@ function renderMacros() {
     b.onclick = () => { state.mc.sel = n; renderMacros(); };
     box.appendChild(b);
   });
+
+  $('#mc-add').disabled = shown >= Q_MACRO_COUNT;
 
   // Mémoire
   const meter = $('#mc-meter');
@@ -3125,7 +3205,11 @@ function renderMacros() {
 
   // Étapes de la macro choisie
   const m = list[sel];
-  $('#mc-title').textContent = `Macro ${sel + 1}`;
+  $('#mc-title').textContent = macroName(sel);
+  $('#mc-name').value = state.mc.names[sel] || '';
+  $('#mc-name').placeholder = `Macro ${sel + 1}`;
+  $('#mc-clear').disabled = !m.steps.length && !m.tail.length;
+  $('#mc-remove').classList.toggle('hidden', shown < 2 || sel !== shown - 1);
   $('#mc-count').textContent = `${m.steps.length} étape${m.steps.length > 1 ? 's' : ''}`;
   const steps = $('#mc-steps');
   steps.innerHTML = '';
@@ -3185,6 +3269,7 @@ function renderMacroKeys() {
   const groups = [
     ['Touches du clavier', [...hidLabels()]],
     ['Autres touches', EXTRA_KEYS],
+    ['Souris', QMK_MOUSE],
   ];
   box.innerHTML = '';
   for (const [title, items] of groups) {
@@ -3228,7 +3313,7 @@ function initSystem() {
     catch { toast('Copie refusée par le navigateur', true); }
   };
   $('#sys-export').onclick = () => {
-    const data = { app: 'ak820-studio', version: 1, light: state.light, perKey: state.pk, perKeyBrightness: state.pkBrightness, layout: state.layoutId, keymap: state.km.draft };
+    const data = { app: 'ak820-studio', version: 1, light: state.light, perKey: state.pk, perKeyBrightness: state.pkBrightness, layout: state.layoutId, keymap: state.km.draft, macroNames: state.mc.names };
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
     a.download = 'ak820-reglages.json';
@@ -3243,7 +3328,8 @@ function initSystem() {
       if (d.perKey && d.perKey.length === 128) { state.pk = d.perKey; store.set('perkey', d.perKey); }
       if (d.perKeyBrightness) state.pkBrightness = d.perKeyBrightness;
       if (d.keymap && state.km.device.base) for (const L of ['base', 'fn']) if (d.keymap[L]) state.km.draft[L] = d.keymap[L];
-      initLighting(); paintPerKey(); renderKeymap();
+      if (Array.isArray(d.macroNames)) saveMacroNames(normNames(d.macroNames));
+      initLighting(); paintPerKey(); renderKeymap(); renderMacros();
       toast('Réglages importés. Envoyez-les au clavier depuis chaque section.');
     } catch (err) { toast('Import impossible : ' + err.message, true); }
     e.target.value = '';
@@ -3340,7 +3426,7 @@ async function connect(devices) {
   state.kb = kb;
   keyTest(false);
   state.km = { layer: state.km.layer, device: {}, draft: {}, factory: {}, selected: null, testing: false };
-  state.mc = { loaded: false, list: [], sel: 0, mods: 0, dirty: false };
+  state.mc = { loaded: false, list: [], sel: 0, mods: 0, dirty: false, names: state.mc.names };
   onConnected();
   return true;
 }
