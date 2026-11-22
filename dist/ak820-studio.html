@@ -1577,6 +1577,9 @@ class Keyboard {
       if (!count) throw new Error('Ce firmware ne gère pas les macros');
       if (macros.length !== count) throw new Error(`${count} macros attendues`);
       const { buffer } = buildMacroBuffer(macros, size);
+      // Garde du firmware : tant que le dernier octet vaut 0xFF, aucune macro ne part ; le dernier
+      // morceau le remet à 0. Une écriture interrompue ne déclenche donc pas de macro à moitié écrite.
+      await this.qCall(CH_STUDIO, QC.MACRO_SET, [(size - 1) >> 8, (size - 1) & 0xff, 1, 0xff]);
       for (let off = 0; off < size; off += Q_MACRO_CHUNK) {
         const n = Math.min(Q_MACRO_CHUNK, size - off);
         await this.qCall(CH_STUDIO, QC.MACRO_SET, [off >> 8, off & 0xff, n, ...buffer.slice(off, off + n)]);

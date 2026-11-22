@@ -520,7 +520,8 @@ test('macros : lecture et écriture sur le faux clavier', async () => {
   sent.length = 0;
   await kb.setMacros(edited);
   const writes = sent.filter((p) => p.data[2] === Q.QC.MACRO_SET);
-  assert.equal(writes.length, Math.ceil(512 / 26), 'tampon entier, par morceaux de 26 octets');
+  assert.equal(writes.length, 1 + Math.ceil(512 / 26), 'garde (0xFF sur le dernier octet) puis tampon entier par morceaux de 26 octets');
+  assert.deepEqual([writes[0].data[3] << 8 | writes[0].data[4], writes[0].data[5], writes[0].data[6]], [511, 1, 0xff]);
   assert.ok(writes.every((p) => p.data[5] <= 26));
   assert.equal(writes.at(-1).data[3] << 8 | writes.at(-1).data[4], 494, 'le dernier morceau vient en dernier');
   assert.equal(mock.state.macros[511], 0);
