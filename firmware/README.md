@@ -127,6 +127,14 @@ Le script télécharge Space Grotesk, VT323 et Inter (Google Fonts) et dessine l
 - **Couleur** : noms de couleurs au lieu de degrés (menu de la molette). Le site garde son sélecteur libre.
 - **Écran** : les textes sont écrits par-dessus l'ancien, sans effacer d'abord leur zone (plus de clignotement, bien moins de pixels envoyés). Mesures dans le simulateur (`sh firmware/sim/run.sh`) : pixels envoyés, fenêtres ouvertes et pixels écrits deux fois par scène.
 
+## Cadran 1.4 (22/11/2026)
+
+- **Macros MC_0 à MC_7** (`DYNAMIC_KEYMAP_MACRO_COUNT 8`) : tampon de 1043 octets en EEPROM, placé après la keymap. Les blocs existants (EEPROM de base, bloc clavier, bloc utilisateur, réglages RGB, keymap) gardent leur adresse et leur taille. `WEAR_LEVELING_*` et `EECONFIG_USER_DATA_SIZE` ne changent pas.
+- Au lieu du passage par VIA, `process_record_user` (`keymaps/cadran/keymap.c`) exécute la macro à l'appui.
+- Format du tampon : celui de `send_string` de QMK (`0x01 0x01` code = appui bref, `0x01 0x02` = appui, `0x01 0x03` = relâche, `0x01 0x04` chiffres = délai en ms, macros séparées par `0x00`).
+- Trois commandes sur le canal 0x14 : `MACRO_INFO` (0x0F), `MACRO_GET` (0x10), `MACRO_SET` (0x11). Détails dans l'en-tête de `studio.c`. Le site ne les utilise pas encore.
+- Coût : +1,5 Ko de flash, RAM inchangée.
+
 ## AK820 Studio (depuis 1.1)
 
 Ouvrir AK820 Studio ([site](https://greg0irek.github.io/ak820-studio/) ou `dist/ak820-studio.html`) dans Chrome ou Edge, clavier branché en USB, puis « Connecter » et choisir « AK820 PRO ».

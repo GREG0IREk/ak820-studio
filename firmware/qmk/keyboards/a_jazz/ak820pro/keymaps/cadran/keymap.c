@@ -159,6 +159,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         return false;
     }
 
+    // Macros MC_0..MC_7 : QMK ne les exécute que par VIA, on le fait ici (tampon EEPROM
+    // écrit par AK820 Studio, voir studio.c). Un seul envoi par appui.
+    if (IS_MACRO_KEYCODE(keycode)) {
+        if (record->event.pressed) dynamic_keymap_macro_send(keycode - QK_MACRO);
+        return false;
+    }
+
     // Only Mac-specific media keys live here; SCR_TOG and the BT* keycodes are
     // handled at keyboard level in ak820pro.c (process_record_kb).
     switch (keycode) {

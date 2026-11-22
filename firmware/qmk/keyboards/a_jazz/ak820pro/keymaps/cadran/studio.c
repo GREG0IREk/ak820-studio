@@ -27,6 +27,17 @@
 //   0x0C PERKEY_SAVE     choisir l'effet (0/1), luminosité (0xFF : inchangée) -> EEPROM
 //   0x0D THEME_NAME i    -> nom de l'interface i en UTF-8 à partir de data[4]
 //   0x0E THEME_SET i     interface de l'écran (appliquée et enregistrée)
+//   0x0F MACRO_INFO      -> [3] nb de macros (MC_0 à MC_n-1), [4] taille du tampon en octets (hi),
+//                           [5] taille du tampon (lo)
+//   0x10 MACRO_GET       off_hi, off_lo, taille (<= 26) -> octets du tampon à partir de data[6]
+//   0x11 MACRO_SET       off_hi, off_lo, taille (<= 26), octets (à partir de data[6]) -> tampon
+//                           Format : celui de send_string de QMK. 0x01 0x01 code = appui bref,
+//                           0x01 0x02 code = appui, 0x01 0x03 code = relâche, 0x01 0x04 chiffres
+//                           '|' = délai en ms ; sinon texte ASCII ; macros séparées par 0x00.
+//                           Écriture : dernier octet du tampon à 0xFF (macros coupées), écrire le
+//                           reste, puis remettre le dernier octet à 0x00. Une écriture interrompue
+//                           laisse donc les macros coupées au lieu de les envoyer à moitié.
+//                           Refusé si taille > 26 ou si la zone dépasse le tampon.
 
 #include QMK_KEYBOARD_H
 
@@ -57,6 +68,9 @@ enum {
     ST_PERKEY_SAVE    = 0x0C,
     ST_THEME_NAME     = 0x0D,
     ST_THEME_SET      = 0x0E,
+    ST_MACRO_INFO     = 0x0F,
+    ST_MACRO_GET      = 0x10,
+    ST_MACRO_SET      = 0x11,
 };
 
 // Position des champs d'interface dans la réponse INFO (après les 5 délais de veille).
@@ -231,6 +245,26 @@ bool ak820_studio_command(uint8_t *data, uint8_t length) {
             if (a[0] >= display_theme_count()) goto refuse;
             display_theme_set(a[0]);
             break;
+        case ST_MACRO_INFO: {
+            uint16_t size = dynamic_keymap_macro_get_buffer_size();
+            a[0] = DYNAMIC_KEYMAP_MACRO_COUNT;
+            a[1] = (uint8_t)(size >> 8);
+            a[2] = (uint8_t)(size & 0xFF);
+            break;
+        }
+        case ST_MACRO_GET:
+        case ST_MACRO_SET: {
+            uint16_t off  = ((uint16_t)a[0] << 8) | a[1];
+            uint8_t  size = a[2];
+            // Taille du tampon en EEPROM ; le paquet ne porte que 26 octets de données.
+            if (size > length - 6 || off > dynamic_keymap_macro_get_buffer_size() ||
+                size > dynamic_keymap_macro_get_buffer_size() - off) goto refuse;
+            if (data[2] == ST_MACRO_SET)
+                dynamic_keymap_macro_set_buffer(off, size, &data[6]);
+            else
+                dynamic_keymap_macro_get_buffer(off, size, &data[6]);
+            break;
+        }
         default:
             goto refuse;
     }
