@@ -50,11 +50,22 @@ static char     shown_conn[16], shown_time[8], shown_date[20], shown_value[20];
 static uint8_t  shown_bat;
 static int8_t   shown_caps;
 static int16_t  shown_sec_angle;
+static uint8_t  shown_menu_sel;
+static painter_font_handle_t shown_edit_font;
+static bool     need_full_clear = true;   // premier dessin de l'interface : tout l'écran
 static uint16_t shown_edit_angle;
 static col_t    shown_edit_col;
 
+// Efface avant un redessin complet. Tout ce qui change d'un écran à l'autre est dans
+// le carré de 108 px au centre (l'anneau est repeint ensuite) : inutile de renvoyer
+// les coins. Après un changement d'interface, tout l'écran est effacé.
 static void clear_all(void) {
-    ui_fill(0, 0, UI_W - 1, UI_H - 1, BG);
+    if (need_full_clear) {
+        ui_fill(0, 0, UI_W - 1, UI_H - 1, BG);
+        need_full_clear = false;
+    } else {
+        ui_fill(10, 10, UI_W - 11, UI_H - 11, BG);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +148,11 @@ static void home_seconds(bool full, uint8_t sec) {
     shown_sec_angle = a;
 }
 
+// Ligne « batterie • MAJ ». Les cases à gauche et à droite s'arrêtent à 28 et 100 :
+// au-delà, les coins de la bande mordraient sur l'anneau. Textes écrits en place.
+#define ROW_X0 28
+#define ROW_X1 100
+
 static void home_row(bool full, const ui_status_t *st) {
     int8_t caps = st->caps ? 1 : 0;
     if (!full && st->battery == shown_bat && caps == shown_caps) return;
@@ -149,12 +165,14 @@ static void home_row(bool full, const ui_status_t *st) {
     int16_t wb = ui_text_width(f_small, bat), wm = ui_text_width(f_small, "MAJ");
     int16_t total = wb + 5 + 3 + 5 + wm;
     int16_t x     = (UI_W - total) / 2;
-    int16_t y     = HOME_ROW_Y;
-    ui_fill(26, y, 102, y + f_small->line_height - 1, BG);
+    int16_t y     = HOME_ROW_Y, yb = y + f_small->line_height - 1;
+    if (x > ROW_X0) ui_fill(ROW_X0, y, x - 1, yb, BG);
     ui_text(f_small, x, y, bat, TEXT, BG);
+    ui_fill(x + wb, y, x + wb + 12, yb, BG);
     int16_t dot_y = y + f_small->line_height / 2;
     ui_fill(x + wb + 5, dot_y - 1, x + wb + 7, dot_y + 1, DOTOFF);
     ui_text(f_small, x + wb + 13, y, "MAJ", caps ? ACCENT : DOTOFF, BG);
+    if (x + total <= ROW_X1) ui_fill(x + total, y, ROW_X1, yb, BG);
 }
 
 static void home_draw(bool full) {
@@ -192,6 +210,13 @@ static void home_draw(bool full) {
     home_row(full, &st);
 }
 
+// Valeur en texte : le nom complet s'il tient dans `max_w` avec la police `f`, sinon
+// le nom court (les noms d'effets longs ne tiennent pas dans l'anneau).
+static void value_fit(uint8_t item, char *buf, size_t n, painter_font_handle_t f, int16_t max_w) {
+    ui_value_text(item, buf, n, false);
+    if (ui_text_width(f, buf) > max_w) ui_value_text(item, buf, n, true);
+}
+
 // ---------------------------------------------------------------------------
 // Menu (carrousel)
 
@@ -212,14 +237,16 @@ static void menu_draw(bool full) {
     ui_text_center(f_mid, MENU_LABEL_Y, 19, 109, UI_ITEM_LABEL[sel], TEXT, BG);
 
     char buf[20];
-    ui_value_text(sel, buf, sizeof(buf), false);
+    value_fit(sel, buf, sizeof(buf), f_small, 68);
     ui_text_center(f_small, MENU_VALUE_Y, 30, 98, buf, GREY, BG);
 
     int16_t x0 = (UI_W - (IT_COUNT * 4 + (IT_COUNT - 1) * 3)) / 2;
     for (uint8_t i = 0; i < IT_COUNT; i++) {
+        if (!full && i != sel && i != shown_menu_sel) continue;   // seuls les deux points concernés changent
         int16_t x = x0 + i * 7;
         ui_fill(x, MENU_DOTS_Y, x + 3, MENU_DOTS_Y + 3, i == sel ? ACCENT : DOTOFF);
     }
+    shown_menu_sel = sel;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +255,7 @@ static void menu_draw(bool full) {
 #define EDIT_ICON_Y  22
 #define EDIT_LABEL_Y 43
 #define EDIT_VALUE_Y 58
-#define EDIT_HINT_Y  90
+#define EDIT_HINT_Y  88
 
 static uint16_t edit_angle(void) {
     uint32_t a = (uint32_t)ui_value_permille(ui.sel) * 36 / 10;
@@ -257,22 +284,32 @@ static void edit_ring(bool full) {
     shown_edit_col   = c;
 }
 
+#define EDIT_MAX_W 92   // largeur de l'intérieur de l'anneau à cette hauteur
+
 static void edit_value(bool full) {
     char buf[20];
     ui_value_text(ui.sel, buf, sizeof(buf), false);
+    // Chiffres en grand ; noms en police moyenne, puis petite si trop larges, puis nom court.
+    painter_font_handle_t f = f_big;
+    if (ui.sel == IT_EFFECT || ui.sel == IT_THEME || ui.sel == IT_HUE || ui_text_width(f_big, buf) > EDIT_MAX_W) f = f_mid;
+    if (f == f_mid && ui_text_width(f_mid, buf) > EDIT_MAX_W) f = f_small;
+    if (ui_text_width(f, buf) > EDIT_MAX_W) ui_value_text(ui.sel, buf, sizeof(buf), true);
     if (!full && strcmp(buf, shown_value) == 0) return;
     strcpy(shown_value, buf);
 
-    ui_fill(15, EDIT_VALUE_Y, 113, EDIT_VALUE_Y + f_big->line_height - 1, BG);
-    bool                  big = ui.sel != IT_EFFECT && ui.sel != IT_THEME && ui.sel != IT_HUE && ui_text_width(f_big, buf) <= 96;
-    painter_font_handle_t f   = big ? f_big : f_mid;
-    int16_t               y   = big ? EDIT_VALUE_Y : EDIT_VALUE_Y + (f_big->line_height - f_mid->line_height) / 2;
-    ui_text(f, (UI_W - ui_text_width(f, buf)) / 2, y, buf, TEXT, BG);
+    int16_t y = EDIT_VALUE_Y + (f_big->line_height - f->line_height) / 2;
+    // La bande n'est effacée que si la police change (le texte se pose sinon par-dessus l'ancien).
+    if (f != shown_edit_font) {
+        ui_fill(17, EDIT_VALUE_Y, 110, EDIT_VALUE_Y + f_big->line_height - 1, BG);
+        shown_edit_font = f;
+    }
+    ui_text_center(f, y, 17, 110, buf, TEXT, BG);
 }
 
 static void edit_draw(bool full) {
     if (full) {
         clear_all();
+        shown_edit_font = NULL;
         col_t c = edit_color();
         ui_image(ic18[ui.sel], 55, EDIT_ICON_Y, c, BG);
         ui_text_center(f_small, EDIT_LABEL_Y, 22, 106, LABEL_UP[ui.sel], GREY, BG);
@@ -288,6 +325,7 @@ static void edit_draw(bool full) {
 // ---------------------------------------------------------------------------
 
 static void enter(void) {
+    need_full_clear = true;
     f_big   = qp_load_font_mem(font_cadran_big);
     f_mid   = qp_load_font_mem(font_cadran_mid);
     f_small = qp_load_font_mem(font_cadran_small);

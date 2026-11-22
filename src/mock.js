@@ -132,7 +132,7 @@ export function mockFamilyB() {
  * defaultHids = [[emplacement, code HID]] (disposition ANSI) pour la keymap d'origine.
  */
 export function mockFamilyQ(defaultHids = []) {
-  const effects = ['Fixe', 'Respiration', 'Vague', 'Arc-en-ciel', 'Spirale', 'Réactif', 'Pluie', 'Chaleur', 'Personnalisé', 'Éteint'];
+  const effects = ['Fixe', 'Touche allumée', 'Touche éteinte', 'Scintillement', 'Pluie', 'Multicolore', 'Respiration', 'Spectre', 'Vague centrale', 'Défilement', 'Roulement', 'Rotation', 'Spirale', 'Explosion', 'Lancement', 'Ondulations', 'Flux', 'Pulsation', 'Bascule', 'Navette', 'Chaleur', 'Personnalisé', 'Éteint'];
   const layerBytes = Q_ROWS * Q_COLS * 2;
   const factory = new Uint8Array(4 * layerBytes);
   const put = (map, layer, slot, code) => {
@@ -162,11 +162,11 @@ export function mockFamilyQ(defaultHids = []) {
       const refuse = () => { r[0] = 0xff; };
       if (d[0] !== 0x07) refuse();
       else if (d[1] === CH_CLOCK && d[2] === 1) state.clock = Array.from(d.slice(3, 10));
-      else if (d[1] === CH_SYS && d[2] === 2) { r.fill(0, 3); r.set(new TextEncoder().encode('cadran-1.2 (démo)'), 3); }
+      else if (d[1] === CH_SYS && d[2] === 2) { r.fill(0, 3); r.set(new TextEncoder().encode('cadran-1.3 (démo)'), 3); }
       else if (d[1] !== CH_STUDIO) refuse();
       else {
         switch (d[2]) {
-          case QC.INFO: r.fill(0, 3); r.set([2, effects.length, 4, Q_ROWS, Q_COLS, Q_LED_COUNT, 5, state.sleep, 8, 0, 87, ...state.minutes, state.themes.length, state.theme], 3); break;
+          case QC.INFO: r.fill(0, 3); r.set([2, effects.length, 4, Q_ROWS, Q_COLS, Q_LED_COUNT, 5, state.sleep, effects.indexOf('Personnalisé'), 0, 87, ...state.minutes, state.themes.length, state.theme], 3); break;
           case QC.EFFECT_NAME: r.fill(0, 4); if (a(0) < effects.length) r.set(new TextEncoder().encode(effects[a(0)]), 4); else refuse(); break;
           case QC.LIGHT_GET: r.set([...state.light, state.max], 3); break;
           case QC.LIGHT_SET: state.light = [a(0), a(1), a(2), Math.min(a(3), state.max), a(4)]; break;

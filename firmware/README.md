@@ -24,10 +24,10 @@ Toutes affichent à l'accueil l'heure, la date, la connexion (USB, BT 1-3, 2,4 G
 Sans action pendant 15 s, le menu se referme et garde le réglage en cours.
 
 **Réglages du menu**
-- Effet : Fixe, Respiration, Vague, Arc-en-ciel, Spirale, Réactif, Pluie, Chaleur, Personnalisé (couleurs par touche envoyées depuis AK820 Studio), Éteint.
+- Effet : 21 effets (Fixe, Touche allumée, Touche éteinte, Scintillement, Pluie, Multicolore, Respiration, Spectre, Vague centrale, Défilement, Roulement, Rotation, Spirale, Explosion, Lancement, Ondulations, Flux, Pulsation, Bascule, Navette, Chaleur), Personnalisé (couleurs par touche envoyées depuis AK820 Studio) et Éteint. Les noms reprennent ceux de l'ancien logiciel Ajazz quand un effet équivalent existe.
 - Luminosité : 0 à 100 %, par pas de 10.
 - Vitesse : 1 à 5.
-- Couleur : teinte par pas de 20°.
+- Couleur : Rouge, Orange, Jaune, Lime, Vert, Menthe, Cyan, Azur, Bleu, Violet, Magenta, Rose, Blanc.
 - Veille de l'écran et de l'éclairage : 1, 3, 5 ou 10 min, ou jamais.
 - Écran : Cadran, Terminal ou Tuiles. Le changement est visible tout de suite. Depuis la 1.2, cette entrée remplace « Retour » : l'appui long revient à l'accueil.
 
@@ -107,9 +107,9 @@ Le script télécharge Space Grotesk, VT323 et Inter (Google Fonts) et dessine l
 | `qmk/keyboards/a_jazz/ak820pro/graphics/ui.h` | contrat entre le socle et les interfaces |
 | `qmk/keyboards/a_jazz/ak820pro/graphics/theme_*.c` | interfaces Cadran, Terminal, Tuiles |
 | `qmk/keyboards/a_jazz/ak820pro/ak820pro.c` | fichier du portage + délai de veille réglable + commandes système HID |
-| `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/` | keymap : molette (volume, sourdine, menu), effet Réactif |
+| `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/` | keymap : molette (volume, sourdine, menu), effets réactifs |
 | `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/studio.c` | canal HID d'AK820 Studio (éclairage, touches, couleurs par touche, veille) |
-| `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/rgb_matrix_user.inc` | effet « Personnalisé » |
+| `qmk/keyboards/a_jazz/ak820pro/keymaps/cadran/rgb_matrix_user.inc` | effets « Personnalisé » et « Touche éteinte » |
 | `qmk/keyboards/a_jazz/ak820pro/graphics/res_*/` | polices et icônes générées |
 | `assets/` | génération des polices et icônes |
 | `sim/` | simulateur de l'écran sur PC (captures PNG) |
@@ -117,6 +117,15 @@ Le script télécharge Space Grotesk, VT323 et Inter (Google Fonts) et dessine l
 | `tools/ak820-maj.c` | outil PC : version, passage en mode flash |
 | `tools/flash.ps1` | flash complet depuis Windows |
 | `tools/sonixflasher/hidapi-windows.patch` | correctif de SonixFlasherC pour Windows |
+| `tools/sonixflasher/partial-erase.patch` | correctif : n'efface que les pages du micrologiciel (garde l'EEPROM) |
+| `tools/sonixflasher/build.sh` | compile `sonixflasher-hid.exe` avec les deux correctifs |
+
+## Cadran 1.3 (22/11/2026)
+
+- **Les réglages survivent aux mises à jour.** `sonixflasher-hid.exe` est recompilé avec `partial-erase.patch` : avec la variable `SF_ERASE_PAGES=n`, seules les n premières pages (1 Ko) sont effacées, pas l'EEPROM en haut de la mémoire. `flash.ps1` la renseigne d'après la taille du fichier (`-FullErase` pour tout effacer). Un flasheur sans le correctif ignore la variable et efface tout. Les numéros d'effets enregistrés par QMK suivent l'ordre de la liste d'effets : la première mise à jour vers 1.3 peut donc afficher un autre effet que celui choisi, les autres réglages restent.
+- **Effets** : 21 au lieu de 8, avec les noms de l'ancien logiciel.
+- **Couleur** : noms de couleurs au lieu de degrés (menu de la molette). Le site garde son sélecteur libre.
+- **Écran** : les textes sont écrits par-dessus l'ancien, sans effacer d'abord leur zone (plus de clignotement, bien moins de pixels envoyés). Mesures dans le simulateur (`sh firmware/sim/run.sh`) : pixels envoyés, fenêtres ouvertes et pixels écrits deux fois par scène.
 
 ## AK820 Studio (depuis 1.1)
 
@@ -146,7 +155,9 @@ Ce que la 1.2 change :
 - commandes `0x0D` et `0x0E` du canal (protocole 2) ;
 - fond de Cadran en gris neutre, ce qui supprime les bords roses des icônes.
 
-L'interface choisie est enregistrée dans un octet libre du bloc EEPROM du clavier : le passage de 1.1 à 1.2 garde tous les réglages.
+L'interface choisie est enregistrée dans un octet libre du bloc EEPROM du clavier.
+
+**Correction : le passage de 1.1 à 1.2 a bien effacé les réglages.** Ce paragraphe disait le contraire. Le flasheur Sonix efface les 256 pages de la puce avant d'écrire, et l'EEPROM émulée est tout en haut : toute mise à jour la remettait à zéro, quelle que soit la version.
 
 **Passage de 1.0 à 1.1 : l'EEPROM repart de zéro.** L'EEPROM émulée change de taille et d'emplacement en flash : effet, couleur, luminosité, délai de veille et dernier profil Bluetooth reviennent aux valeurs par défaut au premier démarrage. Les appareils appairés en Bluetooth sont gardés par la puce radio, pas par ce firmware.
 

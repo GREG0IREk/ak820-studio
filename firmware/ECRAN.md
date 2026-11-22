@@ -25,7 +25,7 @@ Autres fichiers utiles :
 ## Le matériel et ses contraintes
 
 - Écran GC9107 de 128 × 128 px, piloté par Quantum Painter (QMK) en SPI. Origine (0, 0) en haut à gauche.
-- **Pas de tampon d'image.** Le microcontrôleur n'a que 32 Ko de mémoire vive, et une image complète en prendrait 32 Ko. On dessine donc directement sur l'écran : pour changer un texte, on efface sa zone avec la couleur de fond puis on écrit le nouveau texte par-dessus.
+- **Pas de tampon d'image.** Le microcontrôleur n'a que 32 Ko de mémoire vive, et une image complète en prendrait 32 Ko. On dessine donc directement sur l'écran. Règle : ne jamais effacer une zone pour la réécrire (écran vide visible, clignotement, pixels envoyés deux fois). Les cellules des glyphes couvrent toute la hauteur de la police et se touchent : un texte écrit par-dessus l'ancien le remplace sans trou. On repeint en fond seulement ce que le nouveau texte ne recouvre pas (`ui_text_span`, `ui_text_center`), ou la bande entière quand la police change.
 - **Ne redessiner que ce qui change.** Chaque dessin passe par le SPI et prend du temps. Une interface garde ce qu'elle affiche (variables `shown_*` dans `theme_cadran.c`) et ne redessine une zone que si sa valeur a changé.
 - **Couleurs en TSV 0-255** (`col_t {h, s, v}`), le format de Quantum Painter. Pour convertir une couleur web, par exemple #FF8A3D :
   - v = max(r, g, b) ;
@@ -64,7 +64,7 @@ Autres fichiers utiles :
   - `ui.eff_idx` ;
   - `ui.bright_pct` (0 à 100, par pas de 10) ;
   - `ui.speed_lvl` (1 à 5) ;
-  - `ui.hue_deg` (0 à 340, par pas de 20) ;
+  - `ui.hue_idx` (index dans la palette : `ui_hue_name(i)`, Blanc en dernier) ;
   - `ui.sleep_idx` ;
   - `ui.theme_idx`.
 - `ui_status(&st)` : connexion (`CONN_USB`, `CONN_BT`, `CONN_24G`), liaison établie, profil Bluetooth 1 à 3, batterie (0xFF si inconnue), Verr. Maj.
@@ -74,7 +74,7 @@ Autres fichiers utiles :
   - `UI_JOURS[]`, `UI_MOIS[]` (« sam. », « nov. ») ;
   - `ui_effect_name(i)`, `ui_effect_short(i)` (8 caractères au plus), `ui_effect_is_off(i)` ;
   - `ui_theme_name(i)`, `ui_sleep_minutes(i)`.
-- `ui_value_text(item, buf, n, brief)` : la valeur affichable (« 80 % », « 3/5 », « 200° », « 5 min », « Jamais », nom de l'effet, nom de l'interface).
+- `ui_value_text(item, buf, n, brief)` : la valeur affichable (« 80 % », « 3/5 », « Bleu », « 5 min », « Jamais », nom de l'effet, nom de l'interface).
 - `ui_value_permille(item)` : la position de la valeur dans sa plage, de 0 à 1000, pour une jauge.
 - `ui_hue_color()` : la couleur choisie, en saturation et luminosité pleines.
 
@@ -171,7 +171,7 @@ Points d'attention :
 - **Menu, dessin partiel.** Seules deux lignes ou deux tuiles changent : l'ancienne entrée choisie et la nouvelle. Garder l'entrée affichée (`shown_sel`) pour ne redessiner que celles-là. Tout redessiner fonctionne aussi, mais l'écran clignote.
 - **Valeurs dans le menu.** Elles ne changent pas pendant qu'on navigue : seul `ui.sel` change.
 - **Réglage, dessin partiel.** La valeur et la jauge changent. Pour Couleur, la couleur de la jauge suit `ui_hue_color()`.
-- **Texte trop long.** « Personnalisé », « Arc-en-ciel » et les noms d'interface doivent tenir dans la largeur. Mesurer avec `ui_text_width` et prendre une police plus petite si besoin. C'est ce que fait `edit_value()` dans Cadran.
+- **Texte trop long.** « Personnalisé », « Touche allumée » et les noms d'interface doivent tenir dans la largeur. Mesurer avec `ui_text_width` et prendre une police plus petite, puis le nom court (`brief`), si besoin. C'est ce que fait `edit_value()` dans Cadran.
 
 ## Le simulateur
 
@@ -204,6 +204,7 @@ Scènes produites, dans l'ordre de la planche :
 Ce que vérifie le simulateur :
 - **ÉCART :** après chaque dessin partiel, la scène est redessinée en entier et les deux images sont comparées. Toute différence est signalée, avec `<scène>-ecart.png` où les pixels différents sont en rouge. Cela veut dire que l'interface a oublié d'effacer ou de redessiner une zone.
 - **HORS ÉCRAN :** des pixels ont été écrits en dehors des 128 × 128.
+- **Coût de chaque dessin** (ligne « . scène ») : `px` pixels envoyés, `rect` fenêtres ouvertes (3 commandes SPI chacune), `coût` = px + 12 × rect, et `2x` = pixels écrits plus d'une fois dans le même dessin, c'est-à-dire effacés puis réécrits. Objectif : `2x` à 0 et `px` aussi bas que le changement le permet. Scènes de mesure : `accueil-seconde`, `-minute`, `-batterie`, `-maj`, un cran de molette par réglage (`cran <entrée>`), noms d'effets les plus longs (`reglage-effet-long1..4`).
 - **Code de sortie :** 0 s'il n'y a aucun problème. Les images sont rapatriées dans tous les cas.
 
 Le simulateur ne reproduit pas la vitesse du SPI ni les couleurs exactes de la dalle. Il montre le placement, les textes, les couleurs relatives et les oublis de redessin.

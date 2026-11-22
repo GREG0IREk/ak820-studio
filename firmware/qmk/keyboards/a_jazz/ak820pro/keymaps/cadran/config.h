@@ -19,7 +19,7 @@
 #define ENABLE_RGB_MATRIX_DUAL_BEACON
 
 // Version renvoyée par la commande système 0x13/0x02 (outil de mise à jour).
-#define AK820_FW_VERSION "cadran-1.2"
+#define AK820_FW_VERSION "cadran-1.3"
 
 // Ressources chargées par l'interface active (une seule à la fois) : 12 icônes
 // au plus (6 entrées du menu x 2 tailles) et 5 polices. QMK prévoit 8 et 4 par défaut.

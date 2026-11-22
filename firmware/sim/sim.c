@@ -246,7 +246,7 @@ static void save_scaled(const char *path, const uint8_t *img, int scale) {
 // ---------------------------------------------------------------------------
 // Scènes
 
-#define MAX_SCENES 40
+#define MAX_SCENES 60
 static uint8_t     shots[MAX_SCENES][UI_H][UI_W][3];
 static int         n_shots;
 static const char *out_dir;
@@ -385,6 +385,31 @@ static void run_theme(uint8_t idx, const char *dir) {
         display_menu_close();   // valide et revient à l'accueil
         ui.screen = SCR_HOME;
     }
+
+    // Réglage avec les valeurs les plus larges : noms d'effets longs, couleur la plus longue.
+    static const char *const LONG_EFFECTS[] = {"Vague centrale", "Touche allumée", "Touche éteinte", "Personnalisé"};
+    ui.screen = SCR_HOME;
+    display_menu_open();
+    ui.sel = IT_EFFECT;
+    display_menu_press();
+    for (unsigned k = 0; k < sizeof(LONG_EFFECTS) / sizeof(LONG_EFFECTS[0]); k++) {
+        for (uint8_t e = 0; e < ui_effect_count(); e++)
+            if (strcmp(ui_effect_name(e), LONG_EFFECTS[k]) == 0) ui.eff_idx = e;
+        char name[64];
+        snprintf(name, sizeof(name), "reglage-effet-long%u", k + 1);
+        partial(name);
+    }
+    display_menu_close();
+    ui.screen = SCR_HOME;
+    display_menu_open();
+    ui.sel = IT_HUE;
+    display_menu_press();
+    ui.hue_idx = 10;   // Magenta
+    partial("reglage-couleur-magenta");
+    ui.hue_idx = PALETTE_COUNT - 1;   // Blanc
+    partial("reglage-couleur-blanc");
+    display_menu_close();
+    ui.screen = SCR_HOME;
 
     // Planche : toutes les scènes, 2 fois, 6 par ligne.
     int cols = 6, rows = (n_shots + cols - 1) / cols, sc = 2, gap = 8;

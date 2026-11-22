@@ -1,0 +1,93 @@
+--- a/src/flash.c
++++ b/src/flash.c
+@@ -8,14 +8,29 @@
+ #include "mem.h"
+ #include "types.h"
+ #include <stdint.h>
++#include <stdlib.h>
+ #include <stdio.h>
+ #include <unistd.h>
+ 
++/* SF_ERASE_PAGES=n : n'efface que les n premières pages (1 Ko chacune) au lieu de
++   toute la puce. L'EEPROM émulée du clavier est tout en haut de la mémoire : un
++   effacement complet détruit les réglages à chaque mise à jour. */
++uint16_t flash_erase_pages(const device_t *dev) {
++  const char *e = getenv("SF_ERASE_PAGES");
++  if (e) {
++    long n = strtol(e, NULL, 10);
++    if (n > 0 && n < dev->rom_pages)
++      return (uint16_t)n;
++  }
++  return dev->rom_pages;
++}
++
+ bool flash_erase(device_t *dev) {
+   if (!dev || !dev->handle)
+     return false;
+ 
+-  log_info("Erasing flash (pages 0-%d)", dev->rom_pages);
++  uint16_t end_page = flash_erase_pages(dev);
++  log_info("Erasing flash (pages 0-%d)", end_page);
+ 
+   uint8_t buf[REPORT_SIZE];
+   mem_zero(buf, sizeof(buf));
+@@ -23,7 +38,7 @@
+   buf[0] = CMD_ENABLE_ERASE;
+   mem_write_u16_le(buf + 1, CMD_BASE);
+   mem_write_u16_le(buf + 4, 0);              /* Start page */
+-  mem_write_u16_le(buf + 8, dev->rom_pages); /* End page */
++  mem_write_u16_le(buf + 8, end_page); /* End page */
+ 
+   if (!hid_send_report(dev->handle, buf, REPORT_SIZE)) {
+     log_error("Failed to send erase command");
+@@ -36,6 +51,11 @@
+   }
+ 
+   uint16_t checksum = mem_read_u16_le(buf, 8);
++  if (end_page != dev->rom_pages) {
++    /* Effacement partiel : la somme de contrôle de la puce ne vaut plus la valeur d'une puce vide. */
++    log_info("Partial erase (checksum 0x%04x not checked)", checksum);
++    return true;
++  }
+   if (checksum != dev->blank_checksum) {
+     log_error("Erase checksum mismatch: 0x%04x != 0x%04x", checksum,
+               dev->blank_checksum);
+--- a/src/main.c
++++ b/src/main.c
+@@ -173,8 +173,9 @@
+     }
+     sleep(IO_DELAY_SEC);
+ 
+-    /* Verify erase via checksum */
+-    if (!flash_verify_checksum(&dev, dev.blank_checksum)) {
++    /* Verify erase via checksum (impossible après un effacement partiel) */
++    if (flash_erase_pages(&dev) == dev.rom_pages &&
++        !flash_verify_checksum(&dev, dev.blank_checksum)) {
+       log_error("Erase verification failed");
+       cleanup_and_exit(&dev, abs_path, 1);
+     }
+@@ -189,7 +190,13 @@
+   log_info("\n");
+   sleep(IO_DELAY_SEC);
+ 
+-  if (args.flash.offset == 0) {
++  if (args.flash.offset == 0 && flash_erase_pages(&dev) != dev.rom_pages) {
++    /* Effacement partiel : la somme porte aussi sur les pages gardées (EEPROM), pas de comparaison. */
++    uint16_t device_checksum = 0;
++    if (device_get_checksum(&dev, &device_checksum))
++      log_info("Partial erase - device checksum: 0x%04x (firmware 0x%04x)", device_checksum, firmware_checksum);
++    log_info("\n");
++  } else if (args.flash.offset == 0) {
+     /* Verify programmed checksum matches firmware */
+     if (!flash_verify_checksum(&dev, firmware_checksum)) {
+       log_error("Program verification failed");
+--- a/include/flash.h
++++ b/include/flash.h
+@@ -8,6 +8,7 @@
+ #define LAST_CHUNK_OFFSET (REPORT_SIZE - sizeof(uint32_t))
+ 
+ bool flash_program(device_t *dev, const flash_config_t *config);
++uint16_t flash_erase_pages(const device_t *dev);
+ bool flash_erase(device_t *dev);
+ bool flash_verify_checksum(device_t *dev, uint16_t expected_checksum);
+ 

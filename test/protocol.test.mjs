@@ -310,13 +310,13 @@ test('QMK : couleurs HSV', () => {
 
 test('QMK : métadonnées, effets et version', async () => {
   const { kb } = await openQ();
-  assert.equal(kb.caps.modes.length, 10);
-  assert.equal(kb.caps.modes[8].name, 'Personnalisé');
+  assert.equal(kb.caps.modes.length, 23);
+  assert.equal(kb.caps.modes[21].name, 'Personnalisé');
   assert.equal(kb.caps.modes[0].noSpeed, true);
   assert.deepEqual(kb.caps.sleep.map((o) => o.label), ['1 min', '3 min', '5 min', '10 min', 'Jamais']);
   assert.equal(kb.caps.layers.length, 4);
   const info = await kb.info();
-  assert.equal(info.firmware, 'cadran-1.2 (démo)');
+  assert.equal(info.firmware, 'cadran-1.3 (démo)');
   assert.equal(info.batteryLevel, 87);
 });
 
