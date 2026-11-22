@@ -1,7 +1,14 @@
 // Faux clavier pour la démo (?demo=a ou ?demo=b) et les tests Node.
 // Imite les interfaces WebHID et les réponses observées : rien n'est envoyé à un vrai appareil.
-import { VENDOR_ID, CMD, HEADER_LEN } from './protocol.js';
-import { PAGE_RAW, USAGE_RAW, Q_REPORT, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SLOT_MATRIX, Q_ROWS, Q_COLS, Q_LED_COUNT } from './qmk.js';
+import { VENDOR_ID, CMD, HEADER_LEN, buildMacroBuffer } from './protocol.js';
+import { PAGE_RAW, USAGE_RAW, Q_REPORT, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SLOT_MATRIX, Q_ROWS, Q_COLS, Q_LED_COUNT, Q_MACRO_COUNT } from './qmk.js';
+
+const MACRO_SIZE = 512;
+/** Macros de démonstration : Ctrl+C, délai 50 ms, Ctrl+V ; puis 1, 2, 3 espacés de 100 ms. */
+const DEMO_MACROS = [
+  { steps: [{ mods: 1, key: 0x06, delay: 50 }, { mods: 1, key: 0x19, delay: 0 }], tail: [] },
+  { steps: [{ mods: 0, key: 0x1e, delay: 100 }, { mods: 0, key: 0x1f, delay: 100 }, { mods: 0, key: 0x20, delay: 0 }], tail: [] },
+];
 
 class FakeDevice extends EventTarget {
   constructor({ productId, productName, collections, onReport, onFeature, getFeature }) {
@@ -152,6 +159,7 @@ export function mockFamilyQ(defaultHids = []) {
     keymap: factory.slice(), factory, light: [0, 20, 255, 160, 128], max: 200, sleep: 1, minutes: [1, 3, 5, 10, 0],
     perkey: new Uint8Array(Q_LED_COUNT * 3).fill(255), clock: null,
     themes: ['Cadran', 'Terminal', 'Tuiles'], theme: 0,
+    macros: buildMacroBuffer([...DEMO_MACROS, ...Array(Q_MACRO_COUNT - DEMO_MACROS.length).fill({ steps: [], tail: [] })], MACRO_SIZE).buffer,
   };
   const device = new FakeDevice({
     productId: 0x8009,
@@ -182,6 +190,9 @@ export function mockFamilyQ(defaultHids = []) {
           case QC.PERKEY_SAVE: if (a(0)) state.light[0] = 8; if (a(1) !== 0xff) state.light[3] = a(1); break;
           case QC.THEME_NAME: r.fill(0, 4); if (a(0) < state.themes.length) r.set(new TextEncoder().encode(state.themes[a(0)]), 4); else refuse(); break;
           case QC.THEME_SET: if (a(0) < state.themes.length) state.theme = a(0); else refuse(); break;
+          case QC.MACRO_INFO: r.fill(0, 3); r.set([Q_MACRO_COUNT, MACRO_SIZE >> 8, MACRO_SIZE & 0xff], 3); break;
+          case QC.MACRO_GET: { const off = (a(0) << 8) | a(1), n = a(2); if (off + n > MACRO_SIZE) refuse(); else r.set(state.macros.slice(off, off + n), 6); break; }
+          case QC.MACRO_SET: { const off = (a(0) << 8) | a(1), n = a(2); if (off + n > MACRO_SIZE) refuse(); else state.macros.set(d.slice(6, 6 + n), off); break; }
           default: refuse();
         }
       }

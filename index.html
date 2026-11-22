@@ -28,6 +28,7 @@
     <button data-view="perkey"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.6 3.4 6 6L10 20H4v-6z"/><path d="m12.5 5.5 6 6"/></svg>Touche par touche</button>
     <button data-view="screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m4 16 4-4 4 4 3-3 5 5"/><circle cx="15" cy="9" r="1.5"/></svg>Écran</button>
     <button data-view="keymap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10l-3-3M17 17H7l3 3"/></svg>Touches</button>
+    <button data-view="macros"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>Macros</button>
     <button data-view="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Système</button>
   </nav>
 
@@ -171,6 +172,53 @@
           <h2 id="km-title">Aucune touche choisie</h2>
           <input type="search" id="km-search" placeholder="Rechercher une action" disabled>
           <div class="actions" id="km-actions"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Macros -->
+    <section class="view" id="view-macros">
+      <h1>Macros</h1>
+      <p class="lead">Huit suites de touches, envoyées d'un coup. Affectez une macro à une touche dans Touches.</p>
+      <div id="macros-unsupported" class="banner hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span id="macros-unsupported-text"></span></div>
+      <div class="macro-grid" id="macros-body">
+        <div class="card">
+          <div class="macro-list" id="mc-list" role="radiogroup" aria-label="Macros"></div>
+          <div class="field">
+            <div class="label">Octets utilisés</div>
+            <div class="meter"><div id="mc-meter"></div></div>
+            <p class="note" id="mc-usage"></p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content: space-between; margin-bottom: 12px;">
+            <h2 id="mc-title">Macro 1</h2>
+            <span class="note" id="mc-count"></span>
+          </div>
+          <ol class="steps" id="mc-steps"></ol>
+          <div class="field row">
+            <label for="mc-delay-all" class="note">Même délai partout (ms)</label>
+            <input type="number" id="mc-delay-all" min="0" max="9999" step="1" value="0">
+            <button class="btn" id="mc-delay-apply">Appliquer à toutes les étapes</button>
+          </div>
+          <div class="field">
+            <div class="label">Ajouter une étape</div>
+            <div class="row">
+              <div class="seg" id="mc-mods" aria-label="Modificateurs">
+                <button type="button" data-mod="1" aria-pressed="false">Ctrl</button>
+                <button type="button" data-mod="2" aria-pressed="false">Maj</button>
+                <button type="button" data-mod="4" aria-pressed="false">Alt</button>
+                <button type="button" data-mod="8" aria-pressed="false">Win</button>
+              </div>
+              <span class="note">Touche choisie avec ces modificateurs, puis remis à zéro.</span>
+            </div>
+            <input type="search" id="mc-search" placeholder="Rechercher une touche" style="margin-top: 10px;">
+            <div class="actions mc-keys" id="mc-keys"></div>
+          </div>
+          <div class="row end" style="margin-top: 16px;">
+            <span class="note" id="mc-note"></span>
+            <button class="btn primary" id="mc-send">Envoyer au clavier</button>
+          </div>
         </div>
       </div>
     </section>

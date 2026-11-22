@@ -10,7 +10,7 @@
 import {
   FAMILY_Q, PAGE_RAW, USAGE_RAW, Q_REPORT, Q_REFUSED, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SYS_VERSION,
   Q_KEYMAP_CHUNK, Q_PERKEY_CHUNK, Q_LAYERS, SLOT_MATRIX, SLOT_LED, qFrame, qClockArgs, qParseInfo, qString,
-  qDecodeLayer, qEffectInfo, rgbToHsv8, hsv8ToRgb,
+  qDecodeLayer, qEffectInfo, rgbToHsv8, hsv8ToRgb, Q_MACRO_CHUNK,
 } from './qmk.js';
 
 export const VENDOR_ID = 0x0c45;
@@ -231,6 +231,116 @@ export function decodeKeymap(bytes) {
 export function encodeKeymap(slots) {
   const out = new Uint8Array(KEYMAP_BYTES);
   slots.slice(0, 128).forEach((a, i) => out.set(encodeKeyAction(a), i * 4));
+  return out;
+}
+
+// ---------------------------------------------------------------- macros (firmware QMK)
+
+// Tampon au format QMK send_string : 01 01 k appui bref, 01 02 k appui, 01 03 k relâche,
+// 01 04 chiffres « | » délai en ms. Macros séparées par 00 ; le tampon est rempli de 00.
+// Une étape : modificateurs (appui), touche (appui bref), modificateurs (relâche), délai si > 0.
+const M_ESC = 0x01, M_TAP = 0x01, M_DOWN = 0x02, M_UP = 0x03, M_DELAY = 0x04, M_BAR = 0x7c;
+/** Bit de modificateur (Ctrl 0x01, Maj 0x02, Alt 0x04, Win 0x08) -> code HID du modificateur gauche. */
+const MOD_CODES = [[0x01, 0xe0], [0x02, 0xe1], [0x04, 0xe2], [0x08, 0xe3]];
+export const MACRO_MAX_DELAY = 9999;
+
+const isMacroKey = (k) => (k >= 0x04 && k <= 0xa4) || (k >= 0xe0 && k <= 0xe7);
+
+/** Étape -> octets. Lève une erreur si la touche ou le délai sont hors plage. */
+export function encodeMacroStep({ mods = 0, key, delay = 0 }) {
+  if (!Number.isInteger(key) || !isMacroKey(key)) throw new Error(`Touche hors plage : ${key}`);
+  if (!Number.isInteger(delay) || delay < 0 || delay > MACRO_MAX_DELAY) throw new Error(`Délai hors plage (0 à ${MACRO_MAX_DELAY} ms) : ${delay}`);
+  const held = MOD_CODES.filter(([bit]) => mods & bit).map(([, code]) => code);
+  const out = [];
+  for (const c of held) out.push(M_ESC, M_DOWN, c);
+  out.push(M_ESC, M_TAP, key);
+  for (const c of held) out.push(M_ESC, M_UP, c);
+  if (delay > 0) out.push(M_ESC, M_DELAY, ...Array.from(String(delay), (d) => d.charCodeAt(0)), M_BAR);
+  return out;
+}
+
+/** Macro { steps, tail } -> octets (sans le 00 final). La partie non éditable reste en fin. */
+export function encodeMacro(m) {
+  return [...m.steps.flatMap((s) => encodeMacroStep(s)), ...(m.tail || [])];
+}
+
+/** Lit une étape à partir de b[i] ; null si la séquence n'est pas une étape canonique. */
+function readMacroStep(b, i) {
+  let j = i, mods = 0;
+  while (b[j] === M_ESC && b[j + 1] === M_DOWN) {
+    const bit = MOD_CODES.find(([, c]) => c === b[j + 2]);
+    if (!bit) return null;
+    mods |= bit[0];
+    j += 3;
+  }
+  if (b[j] !== M_ESC || b[j + 1] !== M_TAP) return null;
+  const key = b[j + 2];
+  const afterTap = j + 3;
+  let k = afterTap;
+  while (b[k] === M_ESC && b[k + 1] === M_UP) k += 3;
+  const afterUps = k;
+  let delay = 0, afterDelay = afterUps;
+  if (b[k] === M_ESC && b[k + 1] === M_DELAY) {
+    let d = k + 2, digits = '';
+    while (d < b.length && b[d] !== M_BAR && digits.length < 5) digits += String.fromCharCode(b[d++]);
+    if (b[d] === M_BAR && /^\d{1,4}$/.test(digits)) {
+      delay = Number(digits);
+      afterDelay = d + 1;
+    }
+  }
+  // Seule la forme canonique est éditable : on essaie l'étape la plus longue, puis plus courte.
+  // Tout ce qui ne se réécrit pas à l'identique reste dans la partie non éditable.
+  for (const [end, ms] of [[afterDelay, delay], [afterUps, 0], [afterTap, 0]]) {
+    const step = { mods, key, delay: ms };
+    let canonical;
+    try { canonical = encodeMacroStep(step); } catch { return null; }
+    const consumed = b.slice(i, end);
+    if (canonical.length === consumed.length && canonical.every((v, n) => v === consumed[n])) return { step, next: end };
+  }
+  return null;
+}
+
+/** Octets d'une macro -> { steps, tail } ; tail : octets non éditables, conservés tels quels. */
+export function decodeMacro(bytes) {
+  const b = Array.from(bytes);
+  const steps = [];
+  let i = 0;
+  let r;
+  while ((r = readMacroStep(b, i))) {
+    steps.push(r.step);
+    i = r.next;
+  }
+  return { steps, tail: b.slice(i) };
+}
+
+/** Octets qu'occupe une liste de macros, séparateurs 00 compris. */
+export function macroUsage(macros) {
+  return macros.reduce((n, m) => n + encodeMacro(m).length + 1, 0);
+}
+
+/** Liste de macros -> tampon de `size` octets. Le dernier octet reste 00. */
+export function buildMacroBuffer(macros, size) {
+  const buffer = new Uint8Array(size);
+  let pos = 0;
+  for (const m of macros) {
+    const bytes = encodeMacro(m);
+    if (pos + bytes.length + 1 > size) throw new Error(`Macros trop longues : ${pos + bytes.length + 1} octets sur ${size} disponibles`);
+    buffer.set(bytes, pos);
+    pos += bytes.length + 1;
+  }
+  return { buffer, used: pos };
+}
+
+/** Tampon -> `count` macros décodées. */
+export function parseMacroBuffer(buffer, count) {
+  const out = [];
+  let pos = 0;
+  for (let n = 0; n < count; n++) {
+    let end = buffer.indexOf(0, pos);
+    if (end < 0) end = buffer.length;
+    out.push(decodeMacro(buffer.slice(pos, end)));
+    pos = end + 1;
+  }
   return out;
 }
 
@@ -564,6 +674,7 @@ export class Keyboard {
         modes: m.effects, layers: Q_LAYERS.slice(0, m.layers), remapSlots: new Set(SLOT_MATRIX.keys()), matrixTest: true,
         sleep: m.sleepMinutes.map((min, i) => ({ value: i, label: min ? `${min} min` : 'Jamais' })),
         screenThemes: m.themes.map((name, i) => ({ value: i, label: name })),
+        macros: m.macros,
       };
     }
     const a = this.family === FAMILY_A;
@@ -573,7 +684,7 @@ export class Keyboard {
       info: a, keymap: true, keymapRead: a, perKey: true, perKeyRead: a, perKeySlots, perKeyIsoComplete: a, tft: !!this.tft, tftUpload: true,
       tftBuiltIn: a, clock: true, liveLighting: a, secondary: a, rainbowOption: true, modes,
       layers: [{ id: 'base', label: 'Couche normale' }, { id: 'fn', label: 'Couche Fn' }], remapSlots: a ? null : LEGACY_KEY_SLOTS,
-      matrixTest: false, sleep: a ? SLEEP_A : SLEEP_B, screenThemes: [],
+      matrixTest: false, sleep: a ? SLEEP_A : SLEEP_B, screenThemes: [], macros: null,
     };
   }
 
@@ -603,7 +714,14 @@ export class Keyboard {
     const maxBrightness = (await this.qCall(CH_STUDIO, QC.LIGHT_GET))[8] || 255;
     const themes = [];
     for (let i = 0; i < info.themeCount; i++) themes.push(qString((await this.qCall(CH_STUDIO, QC.THEME_NAME, [i])).slice(4)));
-    this.qmeta = { ...info, effects, version, maxBrightness, themes };
+    // Macros : firmware sans MACRO_INFO (refusé ou muet) = pas de macros.
+    let macros = null;
+    try {
+      const r = await this.qCall(CH_STUDIO, QC.MACRO_INFO);
+      macros = { count: r[3], size: (r[4] << 8) | r[5] };
+      if (!macros.count || !macros.size) macros = null;
+    } catch { macros = null; }
+    this.qmeta = { ...info, effects, version, maxBrightness, themes, macros };
     return this.qmeta;
   }
   qLayerIndex(layer) {
@@ -621,6 +739,34 @@ export class Keyboard {
       out.set(r.slice(6, 6 + n), off);
     }
     return qDecodeLayer(out, cols);
+  }
+
+  /** Firmware QMK : les macros, lues par morceaux de 26 octets (MACRO_GET). */
+  getMacros() {
+    return this.mutex.run(async () => {
+      const { count, size } = this.qmeta.macros || {};
+      if (!count) throw new Error('Ce firmware ne gère pas les macros');
+      const buf = new Uint8Array(size);
+      for (let off = 0; off < size; off += Q_MACRO_CHUNK) {
+        const n = Math.min(Q_MACRO_CHUNK, size - off);
+        const r = await this.qCall(CH_STUDIO, QC.MACRO_GET, [off >> 8, off & 0xff, n]);
+        buf.set(r.slice(6, 6 + n), off);
+      }
+      return parseMacroBuffer(buf, count);
+    });
+  }
+  /** Réécrit tout le tampon, par morceaux croissants : le dernier morceau contient le dernier octet. */
+  setMacros(macros) {
+    return this.mutex.run(async () => {
+      const { count, size } = this.qmeta.macros || {};
+      if (!count) throw new Error('Ce firmware ne gère pas les macros');
+      if (macros.length !== count) throw new Error(`${count} macros attendues`);
+      const { buffer } = buildMacroBuffer(macros, size);
+      for (let off = 0; off < size; off += Q_MACRO_CHUNK) {
+        const n = Math.min(Q_MACRO_CHUNK, size - off);
+        await this.qCall(CH_STUDIO, QC.MACRO_SET, [off >> 8, off & 0xff, n, ...buffer.slice(off, off + n)]);
+      }
+    });
   }
 
   /** Touches enfoncées : liste de [ligne, colonne] (test des touches). */
