@@ -174,7 +174,7 @@ function buildKb(container, onKey) {
   const els = new Map();
   for (const k of layout().keys) {
     const d = document.createElement('div');
-    d.className = 'key' + (k.iso ? ' iso' : '');
+    d.className = 'key ' + k.cap + (k.iso ? ' iso' : '');
     d.style.left = (k.x / W) * 100 + '%';
     d.style.top = (k.y / H) * 100 + '%';
     d.style.width = (k.w / W) * 100 + '%';
@@ -183,6 +183,16 @@ function buildKb(container, onKey) {
     d.innerHTML = '<span></span>';
     container.appendChild(d);
     els.set(k.slot, d);
+  }
+  for (const k of layout().decor || []) {
+    const d = document.createElement('div');
+    d.className = 'deco deco-' + k.kind;
+    d.setAttribute('aria-hidden', 'true');
+    d.style.left = (k.x / W) * 100 + '%';
+    d.style.top = (k.y / H) * 100 + '%';
+    d.style.width = (k.w / W) * 100 + '%';
+    d.style.height = (k.h / H) * 100 + '%';
+    container.appendChild(d);
   }
   if (onKey) {
     let down = false;

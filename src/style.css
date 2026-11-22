@@ -10,9 +10,7 @@
   --accent-soft: #ebe8ff;
   --danger: #c4312b;
   --ok: #1d7f4b;
-  --key: #fbfbfc;
-  --key-edge: #cfcfd8;
-  --deck: #e6e6eb;
+  --deck: #2a2a30;
   --radius: 10px;
   --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 16px rgb(0 0 0 / 5%);
   color-scheme: light;
@@ -30,9 +28,7 @@
     --accent-soft: #2a2550;
     --danger: #ff6b63;
     --ok: #4fd18b;
-    --key: #2a2a33;
-    --key-edge: #3a3a46;
-    --deck: #18181d;
+    --deck: #1c1c21;
     --shadow: 0 1px 2px rgb(0 0 0 / 40%);
     color-scheme: dark;
   }
@@ -168,13 +164,29 @@ input[type='search'] { width: 100%; min-height: 38px; padding: 0 12px; border-ra
 /* ---------- clavier */
 .deck { background: var(--deck); border-radius: 14px; padding: 2.2%; container-type: inline-size; }
 .kb { position: relative; width: 100%; aspect-ratio: 16.25 / 6; user-select: none; touch-action: none; }
-.key { position: absolute; padding: 0.25cqw; }
+.key { position: absolute; padding: 0.25cqw; --cap: #e9e9ec; --cap-edge: #c2c2ca; --cap-ink: #1b1b21; }
+/* Couleurs de keycap : seulement le dessin. Une LED par touche (style inline sur le span) passe par-dessus. */
+.key.cap-alpha { --cap: #e9e9ec; --cap-edge: #c2c2ca; --cap-ink: #1b1b21; }
+.key.cap-fn { --cap: #b8b8be; --cap-edge: #8e8e96; --cap-ink: #1b1b21; }
+.key.cap-dark { --cap: #7b7b84; --cap-edge: #56565e; --cap-ink: #f4f4f6; }
+.key.cap-yellow { --cap: #f2c21b; --cap-edge: #c39806; --cap-ink: #1b1b21; }
 .key > span {
   display: flex; align-items: flex-start; justify-content: flex-start; width: 100%; height: 100%;
   padding: 0.45cqw 0.6cqw; border-radius: 0.7cqw;
-  background: var(--key); border: 1px solid var(--key-edge); border-bottom-width: 0.35cqw;
-  font-size: max(6px, 1.25cqw); line-height: 1.1; color: var(--text); overflow: hidden; white-space: pre-line;
+  background: var(--cap); border: 1px solid var(--cap-edge); border-bottom-width: 0.35cqw;
+  font-size: max(6px, 1.25cqw); line-height: 1.1; color: var(--cap-ink); overflow: hidden; white-space: pre-line;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.deco { position: absolute; pointer-events: none; }
+.deco-knob {
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #4b4b53 0%, #1d1d22 42%, #060607 78%);
+  box-shadow: 0 0 0 1px #000, 0 0.25cqw 0.5cqw rgb(0 0 0 / 55%);
+}
+.deco-screen { border-radius: 0.4cqw; background: #030407; border: 1px solid #2c2e38; }
+.deco-screen::after {
+  content: ''; position: absolute; inset: 20% 14%; border-radius: 0.2cqw;
+  background: linear-gradient(180deg, #14233d, #0a1424);
 }
 .key.iso > span { clip-path: polygon(0 0, 100% 0, 100% 100%, 16.7% 100%, 16.7% 50%, 0 50%); }
 .kb.paint .key > span { cursor: crosshair; }
