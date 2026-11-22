@@ -137,6 +137,18 @@ export function hsv8ToRgb(h, s, v = 255) {
   return [f(5), f(3), f(1)].map((x) => Math.round(x * 255));
 }
 
+const HUE_NAMES = ['Rouge', 'Orange', 'Jaune', 'Lime', 'Vert', 'Menthe', 'Cyan', 'Azur', 'Bleu', 'Violet', 'Magenta', 'Rose'];
+/** Nom d'une couleur « #rrggbb » : les mêmes noms que le menu de l'écran du clavier. */
+export function colorName(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || '').trim());
+  if (!m) return '';
+  const rgb = [1, 2, 3].map((i) => parseInt(m[i], 16));
+  const [h, s, v] = rgbToHsv8(rgb);
+  if (v < 40) return 'Noir';
+  if (s < 50) return v > 200 ? 'Blanc' : 'Gris';
+  return HUE_NAMES[Math.round((h / 255) * 12) % 12];
+}
+
 /** Aperçu des effets du firmware, par nom (voir EFFECTS dans graphics/display.c). */
 const PREVIEW = {
   'Fixe': { key: 'static', noSpeed: true },

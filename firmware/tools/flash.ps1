@@ -52,7 +52,7 @@ if (-not (Test-Usb '7140')) {
     }
 }
 
-Start-Sleep -Seconds 1
+Start-Sleep -Seconds 2
 # Le flasheur efface toute la puce, et l'image .bin fait 256 Ko complets (zéros jusqu'au
 # bout) : l'EEPROM émulée (réglages, keymap, couleurs par touche), tout en haut de la
 # mémoire, était effacée puis écrasée à chaque mise à jour. Avec le flasheur corrigé
@@ -76,7 +76,14 @@ if ($FullErase) {
     Write-Host "Écriture de $pages Ko seulement, effacement de $($pages + 2) pages : les réglages sont gardés."
 }
 Write-Host 'Écriture du micrologiciel...'
-$flashCode = Invoke-Tool "$Tools\sonixflasher-hid.exe" @('--vid-pid', '0c45/7140', '--file', $File)
+# Le bootloader met parfois quelques secondes à répondre, ou s'est refermé : on réessaie
+# tant que le clavier est encore en mode flash et que rien n'a été écrit.
+$flashCode = 1
+for ($try = 1; $try -le 3; $try++) {
+    $flashCode = Invoke-Tool "$Tools\sonixflasher-hid.exe" @('--vid-pid', '0c45/7140', '--file', $File)
+    if ($flashCode -eq 0 -or -not (Test-Usb '7140')) { break }
+    if ($try -lt 3) { Write-Host "Nouvel essai ($($try + 1)/3)..."; Start-Sleep -Seconds 3 }
+}
 # Le bootloader redémarre parfois le clavier dès l'écriture vérifiée : la toute
 # dernière somme de contrôle échoue alors que le flash est bon. On juge sur
 # le redémarrage et sur la version renvoyée par le clavier.

@@ -9,7 +9,7 @@ import { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } from './keycodes
 import { decodeFile, renderFrame, toPixels } from './image.js';
 import { mockFamilyA, mockFamilyB, mockFamilyQ } from './mock.js';
 import { SCREEN_PREVIEWS } from './ecrans.js';
-import { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid } from './qmk.js';
+import { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid, colorName } from './qmk.js';
 
 // ------------------------------------------------------------ outils
 
@@ -92,7 +92,8 @@ function colorRow(container, value, onChange, palette = PALETTE) {
   container.innerHTML = '';
   const sync = (v) => {
     $$('.swatch', container).forEach((s) => s.setAttribute('aria-pressed', String(s.dataset.c === v)));
-    hex.textContent = v.toUpperCase();
+    hex.textContent = colorName(v);
+    hex.title = v.toUpperCase();
     input.value = v;
   };
   for (const c of palette) {
@@ -101,7 +102,7 @@ function colorRow(container, value, onChange, palette = PALETTE) {
     s.className = 'swatch';
     s.style.background = c;
     s.dataset.c = c;
-    s.title = c;
+    s.title = colorName(c);
     s.onclick = () => { sync(c); onChange(c); };
     container.appendChild(s);
   }

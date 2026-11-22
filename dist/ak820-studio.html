@@ -628,6 +628,18 @@ function hsv8ToRgb(h, s, v = 255) {
   return [f(5), f(3), f(1)].map((x) => Math.round(x * 255));
 }
 
+const HUE_NAMES = ['Rouge', 'Orange', 'Jaune', 'Lime', 'Vert', 'Menthe', 'Cyan', 'Azur', 'Bleu', 'Violet', 'Magenta', 'Rose'];
+/** Nom d'une couleur « #rrggbb » : les mêmes noms que le menu de l'écran du clavier. */
+function colorName(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || '').trim());
+  if (!m) return '';
+  const rgb = [1, 2, 3].map((i) => parseInt(m[i], 16));
+  const [h, s, v] = rgbToHsv8(rgb);
+  if (v < 40) return 'Noir';
+  if (s < 50) return v > 200 ? 'Blanc' : 'Gris';
+  return HUE_NAMES[Math.round((h / 255) * 12) % 12];
+}
+
 /** Aperçu des effets du firmware, par nom (voir EFFECTS dans graphics/display.c). */
 const PREVIEW = {
   'Fixe': { key: 'static', noSpeed: true },
@@ -706,7 +718,7 @@ function qmkKeyLabel(code, hidLabel) {
   return `Code 0x${code.toString(16).padStart(4, '0')}`;
 }
 
-return { FAMILY_Q, PAGE_RAW, USAGE_RAW, Q_REPORT, Q_SET, Q_REFUSED, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SYS_VERSION, Q_KEYMAP_CHUNK, Q_PERKEY_CHUNK, qFrame, qClockArgs, qParseInfo, qString, Q_LAYERS, Q_ROWS, Q_COLS, SLOT_MATRIX, Q_LED_COUNT, SLOT_LED, qDecodeLayer, rgbToHsv8, hsv8ToRgb, qEffectInfo, KC_NO, KC_TRNS, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, isBasicHid, qmkKeyLabel };
+return { FAMILY_Q, PAGE_RAW, USAGE_RAW, Q_REPORT, Q_SET, Q_REFUSED, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SYS_VERSION, Q_KEYMAP_CHUNK, Q_PERKEY_CHUNK, qFrame, qClockArgs, qParseInfo, qString, Q_LAYERS, Q_ROWS, Q_COLS, SLOT_MATRIX, Q_LED_COUNT, SLOT_LED, qDecodeLayer, rgbToHsv8, hsv8ToRgb, colorName, qEffectInfo, KC_NO, KC_TRNS, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, isBasicHid, qmkKeyLabel };
 })();
 
 // ---- protocol.js
@@ -2097,7 +2109,7 @@ const { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } = __mod.keycodes;
 const { decodeFile, renderFrame, toPixels } = __mod.image;
 const { mockFamilyA, mockFamilyB, mockFamilyQ } = __mod.mock;
 const { SCREEN_PREVIEWS } = __mod.ecrans;
-const { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid } = __mod.qmk;
+const { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid, colorName } = __mod.qmk;
 // Interface d'AK820 Studio.
 
 
@@ -2187,7 +2199,8 @@ function colorRow(container, value, onChange, palette = PALETTE) {
   container.innerHTML = '';
   const sync = (v) => {
     $$('.swatch', container).forEach((s) => s.setAttribute('aria-pressed', String(s.dataset.c === v)));
-    hex.textContent = v.toUpperCase();
+    hex.textContent = colorName(v);
+    hex.title = v.toUpperCase();
     input.value = v;
   };
   for (const c of palette) {
@@ -2196,7 +2209,7 @@ function colorRow(container, value, onChange, palette = PALETTE) {
     s.className = 'swatch';
     s.style.background = c;
     s.dataset.c = c;
-    s.title = c;
+    s.title = colorName(c);
     s.onclick = () => { sync(c); onChange(c); };
     container.appendChild(s);
   }

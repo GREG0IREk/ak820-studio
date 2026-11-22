@@ -52,6 +52,26 @@
    if (checksum != dev->blank_checksum) {
      log_error("Erase checksum mismatch: 0x%04x != 0x%04x", checksum,
                dev->blank_checksum);
+@@ -180,15 +200,16 @@
+     return false;
+   }
+ 
+-  /* Verify checksum unless offset is used */
+-  if (offset == 0) {
++  /* Verify checksum unless offset is used (la somme de la puce couvre aussi les pages
++     gardées après un effacement partiel : pas de comparaison possible) */
++  if (offset == 0 && flash_erase_pages(dev) == dev->rom_pages) {
+     uint16_t recv_checksum = mem_read_u16_le(buf, 8);
+     if (recv_checksum != checksum) {
+       log_error("Checksum mismatch: 0x%04x != 0x%04x", recv_checksum, checksum);
+       return false;
+     }
+   } else {
+-    log_warn("Checksum verification skipped (offset used)");
++    log_warn("Checksum verification skipped (offset used or partial erase)");
+   }
+ 
+   log_info("Programming verified successfully");
 --- a/src/main.c
 +++ b/src/main.c
 @@ -173,8 +173,9 @@

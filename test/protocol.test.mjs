@@ -410,3 +410,14 @@ test('QMK : libellés des codes', () => {
   assert.equal(l(0x7e00), 'Écran marche / arrêt');
   assert.equal(l(0x00af), 'Code 0x00af');
 });
+
+test('noms de couleurs, comme sur l\'écran du clavier', async () => {
+  const { colorName } = await import('../src/qmk.js');
+  assert.equal(colorName('#ff0000'), 'Rouge');
+  assert.equal(colorName('#ff7800'), 'Orange');
+  assert.equal(colorName('#ffffff'), 'Blanc');
+  assert.equal(colorName('#1a1aff'), 'Bleu');
+  assert.equal(colorName('#ff3399'), 'Rose');
+  assert.equal(colorName('#000000'), 'Noir');
+  assert.equal(colorName('zz'), '');
+});
