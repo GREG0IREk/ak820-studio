@@ -213,21 +213,30 @@ export const QMK_KEYBOARD = [
   [0x7c00, 'Mode flash'], [KC_TRNS, 'Transparent (couche du dessous)'], [KC_NO, 'Aucune action'],
 ];
 
+/** Boutons et molette de la souris (QK_MOUSE_* de quantum/keycodes.h, firmware Cadran). */
+export const QMK_MOUSE = [
+  [0x00d1, 'Clic gauche'], [0x00d2, 'Clic droit'], [0x00d3, 'Clic milieu'],
+  [0x00d9, 'Molette haut'], [0x00da, 'Molette bas'],
+];
+
 const MOD_NAMES = [[0x01, 'Ctrl'], [0x02, 'Maj'], [0x04, 'Alt'], [0x08, 'Win']];
 /** Code de base HID (0x04-0xA4, modificateurs 0xE0-0xE7) : même valeur que l'usage HID. */
 export const isBasicHid = (code) => (code >= 0x04 && code <= 0xa4) || (code >= 0xe0 && code <= 0xe7);
 
-/** Libellé d'un code QMK ; hidLabel(code) donne le nom d'une touche de base dans la disposition choisie. */
-export function qmkKeyLabel(code, hidLabel) {
+/**
+ * Libellé d'un code QMK ; hidLabel(code) donne le nom d'une touche de base dans la disposition
+ * choisie, macroName(n) le nom de la macro n (0 à 7), « Macro n » par défaut.
+ */
+export function qmkKeyLabel(code, hidLabel, macroName = (n) => `Macro ${n + 1}`) {
   if (isBasicHid(code)) return hidLabel(code) || `HID 0x${code.toString(16)}`;
-  const named = [...QMK_MEDIA, ...QMK_LIGHTING, ...QMK_KEYBOARD].find(([c]) => c === code);
+  const named = [...QMK_MEDIA, ...QMK_LIGHTING, ...QMK_KEYBOARD, ...QMK_MOUSE].find(([c]) => c === code);
   if (named) return named[1];
   if (code >= 0x0100 && code <= 0x1fff) {
     const mods = (code >> 8) & 0x1f, base = code & 0xff;
     const names = MOD_NAMES.filter(([m]) => mods & m).map(([, n]) => (mods & 0x10 ? n + ' d.' : n));
-    return [...names, qmkKeyLabel(base, hidLabel)].join('+');
+    return [...names, qmkKeyLabel(base, hidLabel, macroName)].join('+');
   }
-  if (code >= QK_MACRO && code < QK_MACRO + Q_MACRO_COUNT) return `Macro ${code - QK_MACRO + 1}`;
+  if (code >= QK_MACRO && code < QK_MACRO + Q_MACRO_COUNT) return macroName(code - QK_MACRO);
   if (code >= 0x5220 && code <= 0x523f) return `Couche ${code & 0x1f} (maintenue)`;
   if (code >= 0x5260 && code <= 0x527f) return `Couche ${code & 0x1f} (bascule)`;
   return `Code 0x${code.toString(16).padStart(4, '0')}`;

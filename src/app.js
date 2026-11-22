@@ -2,14 +2,14 @@
 import {
   VENDOR_ID, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, CONTROL_USAGE_PAGES, FAMILY_A,
   MODES, supportedDirections, classify, Keyboard, TFT_SIZE, LEGACY_MAX_FRAMES, parseHex,
-  defaultKeymap, macroUsage, encodeMacro,
+  defaultKeymap, macroUsage, encodeMacro, macrosShown,
 } from './protocol.js';
 import { LAYOUTS } from './layouts.js';
 import { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } from './keycodes.js';
 import { decodeFile, renderFrame, toPixels } from './image.js';
 import { mockFamilyA, mockFamilyB, mockFamilyQ } from './mock.js';
 import { SCREEN_PREVIEWS } from './ecrans.js';
-import { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid, colorName, QK_MACRO } from './qmk.js';
+import { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, QMK_MOUSE, KC_TRNS, SLOT_MATRIX, isBasicHid, colorName, QK_MACRO, Q_MACRO_COUNT } from './qmk.js';
 
 // ------------------------------------------------------------ outils
 
@@ -144,7 +144,7 @@ const state = {
   pkBrightness: store.get('pkBrightness', 5),
   tft: { frames: [], fileName: '', opts: store.get('tftOpts', { fit: 'cover', zoom: 1, offsetX: 0, offsetY: 0, background: '#000000', speed: 1 }), encoded: [] },
   km: { layer: 'base', device: {}, draft: {}, factory: {}, selected: null, testing: false },
-  mc: { loaded: false, list: [], sel: 0, mods: 0, dirty: false },
+  mc: { loaded: false, list: [], sel: 0, mods: 0, dirty: false, names: normNames(store.get('macroNames', [])) },
   logOn: false,
   log: [],
 };
@@ -573,8 +573,8 @@ function renderKeymap() {
     const isDefault = isQ() ? !a || !fac || sameAction(a, fac[k.slot]) : !a || a.kind === 'default' || (a.kind === 'keyboard' && a.usage === k.hid);
     const diff = draft && dev && !sameAction(a, dev[k.slot]);
     if (diff) changed++;
-    if (isQ()) el.firstChild.textContent = !a ? k.label : a.code === KC_TRNS ? '' : actionLabel(a, labels);
-    else el.firstChild.textContent = isDefault ? k.label : actionLabel(a, labels);
+    if (isQ()) el.firstChild.textContent = !a ? k.label : a.code === KC_TRNS ? '' : actionLabel(a, labels, macroName);
+    else el.firstChild.textContent = isDefault ? k.label : actionLabel(a, labels, macroName);
     el.classList.toggle('mod', !isDefault);
     el.classList.toggle('sel', state.km.selected === k.slot);
     el.classList.toggle('na', !keyRemappable(k.slot));
@@ -598,11 +598,11 @@ function renderPicker() {
   const fac = state.km.factory[L];
   const q = (list) => list.map(([c, l]) => [{ kind: 'qmk', code: c }, l]);
   const groups = isQ() ? [
-    ['Origine', fac && fac[slot] ? [[fac[slot], `${fac[slot].code === KC_TRNS ? 'Transparent' : actionLabel(fac[slot], labels)} (origine)`]] : []],
+    ['Origine', fac && fac[slot] ? [[fac[slot], `${fac[slot].code === KC_TRNS ? 'Transparent' : actionLabel(fac[slot], labels, macroName)} (origine)`]] : []],
     ['Touches du clavier', q([...labels])],
     ['Autres touches', q(EXTRA_KEYS)],
     ['Multimédia', q(QMK_MEDIA)],
-    ['Macros', state.kb.caps.macros ? q(Array.from({ length: state.kb.caps.macros.count }, (_, n) => [QK_MACRO + n, `Macro ${n + 1}`])) : []],
+    ['Macros', state.kb.caps.macros ? q(Array.from({ length: shownMacros() }, (_, n) => [QK_MACRO + n, macroName(n)])) : []],
     ['Éclairage', q(QMK_LIGHTING)],
     ['Clavier', q(QMK_KEYBOARD)],
   ] : [
@@ -636,6 +636,20 @@ const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICON_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 const ICON_REMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
+/** Noms de macros : huit chaînes, vides pour « Macro n ». */
+function normNames(a) {
+  return Array.from({ length: Q_MACRO_COUNT }, (_, n) => (Array.isArray(a) && typeof a[n] === 'string' ? a[n].trim().slice(0, 32) : ''));
+}
+function saveMacroNames(names) {
+  state.mc.names = names;
+  store.set('macroNames', names);
+}
+/** Nom affiché d'une macro : celui qu'on lui a donné, sinon « Macro n ». */
+const macroName = (n) => state.mc.names[n] || `Macro ${n + 1}`;
+/** Nombre de macros affichées (voir macrosShown dans protocol.js). */
+const shownMacros = () => macrosShown(state.mc.list, store.get('macroShown', 1));
+const emptyMacro = () => ({ steps: [], tail: [] });
+
 function initMacros() {
   $$('#mc-mods button').forEach((b) => (b.onclick = () => { state.mc.mods ^= +b.dataset.mod; renderMacros(); }));
   $('#mc-search').oninput = renderMacroKeys;
@@ -649,6 +663,31 @@ function initMacros() {
     state.mc.dirty = false;
     renderMacros();
   }, 'Macros envoyées au clavier');
+  $('#mc-add').onclick = () => {
+    const n = shownMacros();
+    if (n >= Q_MACRO_COUNT) return;
+    store.set('macroShown', n + 1);
+    state.mc.sel = n;
+    renderMacros();
+  };
+  $('#mc-clear').onclick = () => mcEdit((all) => { all[state.mc.sel] = emptyMacro(); });
+  // Seule la dernière macro affichée se supprime : elle est vidée et masquée.
+  $('#mc-remove').onclick = () => {
+    const n = shownMacros(), sel = state.mc.sel;
+    if (n < 2 || sel !== n - 1) return;
+    const names = state.mc.names.slice();
+    names[sel] = '';
+    saveMacroNames(names);
+    store.set('macroShown', n - 1);
+    state.mc.sel = n - 2;
+    mcEdit((all) => { all[sel] = emptyMacro(); });
+  };
+  $('#mc-name').onchange = (e) => {
+    const names = state.mc.names.slice();
+    names[state.mc.sel] = e.target.value.trim().slice(0, 32);
+    saveMacroNames(names);
+    renderMacros();
+  };
 }
 
 /** Délai saisi -> entier entre 0 et 9999 ms ; null si la saisie est vide ou non numérique. */
@@ -681,7 +720,8 @@ function mcEdit(fn) {
 
 function stepLabel(s) {
   const mods = MOD_LABELS.filter(([bit]) => s.mods & bit).map(([, n]) => n);
-  return [...mods, actionLabel({ kind: 'keyboard', usage: s.key }, hidLabels())].join('+');
+  const mouse = QMK_MOUSE.find(([code]) => code === s.key);
+  return [...mods, mouse ? mouse[1] : actionLabel({ kind: 'keyboard', usage: s.key }, hidLabels())].join('+');
 }
 
 function macroTool(html, label, disabled, fn) {
@@ -708,20 +748,23 @@ function renderMacros() {
     return;
   }
   if (!state.mc.loaded) return;
-  const { list, sel } = state.mc;
+  const { list } = state.mc;
+  const shown = shownMacros();
+  if (state.mc.sel >= shown) state.mc.sel = shown - 1;
+  const sel = state.mc.sel;
   const size = kb.caps.macros.size, used = macroUsage(list);
 
   // Liste des macros
   const box = $('#mc-list');
   box.innerHTML = '';
-  list.forEach((m, n) => {
+  list.slice(0, shown).forEach((m, n) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'mc-item';
     b.setAttribute('aria-pressed', String(n === sel));
     const name = document.createElement('span');
     name.className = 'mc-name';
-    name.textContent = `Macro ${n + 1}`;
+    name.textContent = macroName(n);
     const info = document.createElement('span');
     info.className = 'note';
     const count = m.steps.length;
@@ -730,6 +773,8 @@ function renderMacros() {
     b.onclick = () => { state.mc.sel = n; renderMacros(); };
     box.appendChild(b);
   });
+
+  $('#mc-add').disabled = shown >= Q_MACRO_COUNT;
 
   // Mémoire
   const meter = $('#mc-meter');
@@ -742,7 +787,11 @@ function renderMacros() {
 
   // Étapes de la macro choisie
   const m = list[sel];
-  $('#mc-title').textContent = `Macro ${sel + 1}`;
+  $('#mc-title').textContent = macroName(sel);
+  $('#mc-name').value = state.mc.names[sel] || '';
+  $('#mc-name').placeholder = `Macro ${sel + 1}`;
+  $('#mc-clear').disabled = !m.steps.length && !m.tail.length;
+  $('#mc-remove').classList.toggle('hidden', shown < 2 || sel !== shown - 1);
   $('#mc-count').textContent = `${m.steps.length} étape${m.steps.length > 1 ? 's' : ''}`;
   const steps = $('#mc-steps');
   steps.innerHTML = '';
@@ -802,6 +851,7 @@ function renderMacroKeys() {
   const groups = [
     ['Touches du clavier', [...hidLabels()]],
     ['Autres touches', EXTRA_KEYS],
+    ['Souris', QMK_MOUSE],
   ];
   box.innerHTML = '';
   for (const [title, items] of groups) {
@@ -845,7 +895,7 @@ function initSystem() {
     catch { toast('Copie refusée par le navigateur', true); }
   };
   $('#sys-export').onclick = () => {
-    const data = { app: 'ak820-studio', version: 1, light: state.light, perKey: state.pk, perKeyBrightness: state.pkBrightness, layout: state.layoutId, keymap: state.km.draft };
+    const data = { app: 'ak820-studio', version: 1, light: state.light, perKey: state.pk, perKeyBrightness: state.pkBrightness, layout: state.layoutId, keymap: state.km.draft, macroNames: state.mc.names };
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
     a.download = 'ak820-reglages.json';
@@ -860,7 +910,8 @@ function initSystem() {
       if (d.perKey && d.perKey.length === 128) { state.pk = d.perKey; store.set('perkey', d.perKey); }
       if (d.perKeyBrightness) state.pkBrightness = d.perKeyBrightness;
       if (d.keymap && state.km.device.base) for (const L of ['base', 'fn']) if (d.keymap[L]) state.km.draft[L] = d.keymap[L];
-      initLighting(); paintPerKey(); renderKeymap();
+      if (Array.isArray(d.macroNames)) saveMacroNames(normNames(d.macroNames));
+      initLighting(); paintPerKey(); renderKeymap(); renderMacros();
       toast('Réglages importés. Envoyez-les au clavier depuis chaque section.');
     } catch (err) { toast('Import impossible : ' + err.message, true); }
     e.target.value = '';
@@ -957,7 +1008,7 @@ async function connect(devices) {
   state.kb = kb;
   keyTest(false);
   state.km = { layer: state.km.layer, device: {}, draft: {}, factory: {}, selected: null, testing: false };
-  state.mc = { loaded: false, list: [], sel: 0, mods: 0, dirty: false };
+  state.mc = { loaded: false, list: [], sel: 0, mods: 0, dirty: false, names: state.mc.names };
   onConnected();
   return true;
 }

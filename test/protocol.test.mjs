@@ -514,6 +514,7 @@ test('macros : lecture et écriture sur le faux clavier', async () => {
   assert.equal(macros.length, 8);
   assert.deepEqual(macros[0].steps, [{ mods: 1, key: 0x06, delay: 50 }, { mods: 1, key: 0x19, delay: 0 }]);
   assert.deepEqual(macros[7], M([]));
+  assert.deepEqual(macros[2].steps, [{ mods: 0, key: 0xd1, delay: 100 }, { mods: 1, key: 0xda, delay: 0 }], 'démo : clic gauche, puis Ctrl + molette bas');
 
   const edited = macros.map((m) => ({ steps: m.steps.map((s) => ({ ...s })), tail: [...m.tail] }));
   edited[2] = M([{ mods: 2, key: 0x0b, delay: 9999 }, { mods: 0, key: 0x28, delay: 0 }]);
@@ -550,4 +551,53 @@ test('macros : affectation à une touche, libellés 0x7700 + n', () => {
   assert.equal(actionLabel({ kind: 'qmk', code: 0x7702 }, new Map()), 'Macro 3');
   assert.equal(actionLabel({ kind: 'qmk', code: 0x7707 }, new Map()), 'Macro 8');
   assert.equal(actionLabel({ kind: 'qmk', code: 0x7708 }, new Map()), 'Code 0x7708');
+});
+
+test('macros : libellés avec les noms donnés par l\'utilisateur', () => {
+  const nom = (n) => (n === 0 ? 'Ouvrir' : `Macro ${n + 1}`);
+  assert.equal(actionLabel({ kind: 'qmk', code: 0x7700 }, new Map(), nom), 'Ouvrir');
+  assert.equal(actionLabel({ kind: 'qmk', code: 0x7701 }, new Map(), nom), 'Macro 2');
+  assert.equal(Q.qmkKeyLabel(0x7700, () => '', nom), 'Ouvrir');
+});
+
+test('macros : clics et molette, codes QMK de quantum/keycodes.h', () => {
+  assert.deepEqual(Q.QMK_MOUSE.map(([c]) => c), [0xd1, 0xd2, 0xd3, 0xd9, 0xda]);
+  assert.deepEqual(Q.QMK_MOUSE.map(([, l]) => l), ['Clic gauche', 'Clic droit', 'Clic milieu', 'Molette haut', 'Molette bas']);
+  assert.equal(actionLabel({ kind: 'qmk', code: 0xd3 }, new Map()), 'Clic milieu');
+  assert.deepEqual(P.encodeMacroStep({ key: 0xd1 }), [ESC, TAP, 0xd1]);
+  assert.deepEqual(P.encodeMacroStep({ mods: 0x02, key: 0xd2, delay: 30 }), [ESC, DOWN, 0xe1, ESC, TAP, 0xd2, ESC, UP, 0xe1, ESC, DELAY, ...digits(30), BAR]);
+  assert.throws(() => P.encodeMacroStep({ key: 0xd4 }), /Touche hors plage/);
+  assert.throws(() => P.encodeMacroStep({ key: 0xd8 }), /Touche hors plage/);
+  assert.throws(() => P.encodeMacroStep({ key: 0xdb }), /Touche hors plage/);
+});
+
+test('macros : aller-retour avec clics et molette, mélangés aux touches', () => {
+  const steps = [
+    { mods: 0, key: 0xd3, delay: 0 },
+    { mods: 0x01, key: 0xda, delay: 200 },
+    { mods: 0x04, key: 0x2b, delay: 5 },
+    { mods: 0, key: 0xd9, delay: 0 },
+    { mods: 0x08, key: 0xd1, delay: 9999 },
+  ];
+  const bytes = P.encodeMacro(M(steps));
+  assert.deepEqual(P.decodeMacro(bytes), M(steps));
+  assert.deepEqual(P.encodeMacro(P.decodeMacro(bytes)), bytes);
+  // Une macro écrite avant l'ajout des clics (sans 0xD1 à 0xDA) se lit comme avant.
+  const old = [ESC, TAP, 0x04, ESC, DELAY, ...digits(10), BAR];
+  assert.deepEqual(P.decodeMacro(old), M([{ mods: 0, key: 4, delay: 10 }]));
+});
+
+test('macros : nombre de macros affichées', () => {
+  const vides = () => Array.from({ length: 8 }, () => M([]));
+  const pleines = (n) => Array.from({ length: 8 }, (_, i) => (i < n ? M([{ mods: 0, key: 4, delay: 0 }]) : M([])));
+  assert.equal(P.macrosShown(vides()), 1, 'au départ, une seule macro');
+  assert.equal(P.macrosShown(vides(), 3), 3, 'le nombre mémorisé est repris');
+  assert.equal(P.macrosShown(vides(), 99), 8, 'plafonné à 8');
+  assert.equal(P.macrosShown(vides(), 0), 1, 'au moins une');
+  assert.equal(P.macrosShown(vides(), 'x'), 1, 'valeur mémorisée invalide : une seule');
+  assert.equal(P.macrosShown(pleines(2)), 2, 'jusqu\'à la dernière non vide');
+  assert.equal(P.macrosShown(pleines(5), 3), 5, 'une macro remplie au-delà du mémorisé s\'affiche');
+  assert.equal(P.macrosShown(pleines(0), 4), 4);
+  const tail = vides().map((m, i) => (i === 6 ? M([], [0x99]) : m));
+  assert.equal(P.macrosShown(tail, 1), 7, 'octets non éditables comptent comme contenu');
 });

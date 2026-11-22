@@ -8,6 +8,8 @@ const MACRO_SIZE = 512;
 const DEMO_MACROS = [
   { steps: [{ mods: 1, key: 0x06, delay: 50 }, { mods: 1, key: 0x19, delay: 0 }], tail: [] },
   { steps: [{ mods: 0, key: 0x1e, delay: 100 }, { mods: 0, key: 0x1f, delay: 100 }, { mods: 0, key: 0x20, delay: 0 }], tail: [] },
+  /** Clic gauche, puis molette bas avec Ctrl maintenu. */
+  { steps: [{ mods: 0, key: 0xd1, delay: 100 }, { mods: 1, key: 0xda, delay: 0 }], tail: [] },
 ];
 
 class FakeDevice extends EventTarget {

@@ -10,7 +10,7 @@
 import {
   FAMILY_Q, PAGE_RAW, USAGE_RAW, Q_REPORT, Q_REFUSED, CH_CLOCK, CH_SYS, CH_STUDIO, QC, SYS_VERSION,
   Q_KEYMAP_CHUNK, Q_PERKEY_CHUNK, Q_LAYERS, SLOT_MATRIX, SLOT_LED, qFrame, qClockArgs, qParseInfo, qString,
-  qDecodeLayer, qEffectInfo, rgbToHsv8, hsv8ToRgb, Q_MACRO_CHUNK,
+  qDecodeLayer, qEffectInfo, rgbToHsv8, hsv8ToRgb, Q_MACRO_CHUNK, Q_MACRO_COUNT, QMK_MOUSE,
 } from './qmk.js';
 
 export const VENDOR_ID = 0x0c45;
@@ -244,9 +244,11 @@ const M_ESC = 0x01, M_TAP = 0x01, M_DOWN = 0x02, M_UP = 0x03, M_DELAY = 0x04, M_
 const MOD_CODES = [[0x01, 0xe0], [0x02, 0xe1], [0x04, 0xe2], [0x08, 0xe3]];
 export const MACRO_MAX_DELAY = 9999;
 
-const isMacroKey = (k) => (k >= 0x04 && k <= 0xa4) || (k >= 0xe0 && k <= 0xe7);
+/** Codes de souris QMK utilisables comme étape : clic gauche, droit, milieu, molette haut et bas. */
+const MOUSE_STEP_CODES = QMK_MOUSE.map(([code]) => code);
+const isMacroKey = (k) => (k >= 0x04 && k <= 0xa4) || (k >= 0xe0 && k <= 0xe7) || MOUSE_STEP_CODES.includes(k);
 
-/** Étape -> octets. Lève une erreur si la touche ou le délai sont hors plage. */
+/** Étape -> octets. Touche : code HID (clavier) ou code de souris QMK (clic, molette). Lève une erreur si la touche ou le délai sont hors plage. */
 export function encodeMacroStep({ mods = 0, key, delay = 0 }) {
   if (!Number.isInteger(key) || !isMacroKey(key)) throw new Error(`Touche hors plage : ${key}`);
   if (!Number.isInteger(delay) || delay < 0 || delay > MACRO_MAX_DELAY) throw new Error(`Délai hors plage (0 à ${MACRO_MAX_DELAY} ms) : ${delay}`);
@@ -311,6 +313,16 @@ export function decodeMacro(bytes) {
     i = r.next;
   }
   return { steps, tail: b.slice(i) };
+}
+
+/**
+ * Nombre de macros affichées : au moins une, jusqu'à la dernière non vide, et le nombre mémorisé
+ * (plafonné à Q_MACRO_COUNT).
+ */
+export function macrosShown(list, remembered = 1) {
+  let last = -1;
+  list.forEach((m, n) => { if (m.steps.length || m.tail.length) last = n; });
+  return Math.min(Q_MACRO_COUNT, Math.max(1, last + 1, Number(remembered) || 1));
 }
 
 /** Octets qu'occupe une liste de macros, séparateurs 00 compris. */
