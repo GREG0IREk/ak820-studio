@@ -22,10 +22,15 @@ export const QC = {
   INFO: 0x01, EFFECT_NAME: 0x02, LIGHT_GET: 0x03, LIGHT_SET: 0x04, SLEEP_SET: 0x05,
   KEYMAP_GET: 0x06, KEY_SET: 0x07, KEYMAP_DEFAULT: 0x08, MATRIX: 0x09,
   PERKEY_GET: 0x0a, PERKEY_SET: 0x0b, PERKEY_SAVE: 0x0c, THEME_NAME: 0x0d, THEME_SET: 0x0e,
+  MACRO_INFO: 0x0f, MACRO_GET: 0x10, MACRO_SET: 0x11,
 };
 export const SYS_VERSION = 0x02;
 export const Q_KEYMAP_CHUNK = 26;
 export const Q_PERKEY_CHUNK = 9;
+export const Q_MACRO_CHUNK = 26;
+/** Codes QMK des macros : QK_MACRO (0x7700) + numéro de macro (0 à 7). */
+export const QK_MACRO = 0x7700;
+export const Q_MACRO_COUNT = 8;
 
 /** Paquet de 32 octets [0x07, canal, commande, arguments…]. */
 export function qFrame(channel, cmd, args = []) {
@@ -222,6 +227,7 @@ export function qmkKeyLabel(code, hidLabel) {
     const names = MOD_NAMES.filter(([m]) => mods & m).map(([, n]) => (mods & 0x10 ? n + ' d.' : n));
     return [...names, qmkKeyLabel(base, hidLabel)].join('+');
   }
+  if (code >= QK_MACRO && code < QK_MACRO + Q_MACRO_COUNT) return `Macro ${code - QK_MACRO + 1}`;
   if (code >= 0x5220 && code <= 0x523f) return `Couche ${code & 0x1f} (maintenue)`;
   if (code >= 0x5260 && code <= 0x527f) return `Couche ${code & 0x1f} (bascule)`;
   return `Code 0x${code.toString(16).padStart(4, '0')}`;

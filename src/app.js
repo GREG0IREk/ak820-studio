@@ -2,14 +2,14 @@
 import {
   VENDOR_ID, PAGE_FEATURE, PAGE_TFT_A, PAGE_TFT_B, CONTROL_USAGE_PAGES, FAMILY_A,
   MODES, supportedDirections, classify, Keyboard, TFT_SIZE, LEGACY_MAX_FRAMES, parseHex,
-  defaultKeymap,
+  defaultKeymap, macroUsage, encodeMacro,
 } from './protocol.js';
 import { LAYOUTS } from './layouts.js';
 import { EXTRA_KEYS, CONSUMER, MOUSE, actionLabel, sameAction } from './keycodes.js';
 import { decodeFile, renderFrame, toPixels } from './image.js';
 import { mockFamilyA, mockFamilyB, mockFamilyQ } from './mock.js';
 import { SCREEN_PREVIEWS } from './ecrans.js';
-import { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid, colorName } from './qmk.js';
+import { FAMILY_Q, PAGE_RAW, QMK_MEDIA, QMK_LIGHTING, QMK_KEYBOARD, KC_TRNS, SLOT_MATRIX, isBasicHid, colorName, QK_MACRO } from './qmk.js';
 
 // ------------------------------------------------------------ outils
 
@@ -144,6 +144,7 @@ const state = {
   pkBrightness: store.get('pkBrightness', 5),
   tft: { frames: [], fileName: '', opts: store.get('tftOpts', { fit: 'cover', zoom: 1, offsetX: 0, offsetY: 0, background: '#000000', speed: 1 }), encoded: [] },
   km: { layer: 'base', device: {}, draft: {}, factory: {}, selected: null, testing: false },
+  mc: { loaded: false, list: [], sel: 0, mods: 0, dirty: false },
   logOn: false,
   log: [],
 };
@@ -162,6 +163,7 @@ function show(view) {
   $$('#nav button').forEach((b) => b.setAttribute('aria-current', b.dataset.view === view ? 'page' : 'false'));
   if (view !== 'welcome') { state.view = view; store.set('view', view); }
   if (view === 'keymap') ensureKeymap();
+  if (view === 'macros') ensureMacros();
   previewLoop(view === 'lighting');
 }
 $$('#nav button').forEach((b) => (b.onclick = () => show(b.dataset.view)));
@@ -600,6 +602,7 @@ function renderPicker() {
     ['Touches du clavier', q([...labels])],
     ['Autres touches', q(EXTRA_KEYS)],
     ['Multimédia', q(QMK_MEDIA)],
+    ['Macros', state.kb.caps.macros ? q(Array.from({ length: state.kb.caps.macros.count }, (_, n) => [QK_MACRO + n, `Macro ${n + 1}`])) : []],
     ['Éclairage', q(QMK_LIGHTING)],
     ['Clavier', q(QMK_KEYBOARD)],
   ] : [
@@ -620,6 +623,205 @@ function renderPicker() {
       c.type = 'button'; c.className = 'chip'; c.textContent = label;
       c.setAttribute('aria-pressed', String(sameAction(action, cur)));
       c.onclick = () => { state.km.draft[L][slot] = action; renderKeymap(); renderPicker(); };
+      list.appendChild(c);
+    }
+    box.appendChild(list);
+  }
+}
+
+// ------------------------------------------------------------ macros
+
+const MOD_LABELS = [[0x01, 'Ctrl'], [0x02, 'Maj'], [0x04, 'Alt'], [0x08, 'Win']];
+const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
+const ICON_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+const ICON_REMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+function initMacros() {
+  $$('#mc-mods button').forEach((b) => (b.onclick = () => { state.mc.mods ^= +b.dataset.mod; renderMacros(); }));
+  $('#mc-search').oninput = renderMacroKeys;
+  $('#mc-delay-apply').onclick = () => {
+    const v = clampDelay($('#mc-delay-all').value);
+    if (v === null) return toast('Indiquez un délai entre 0 et 9999 ms.', true);
+    mcEdit((all) => { all[state.mc.sel].steps.forEach((s) => (s.delay = v)); });
+  };
+  $('#mc-send').onclick = (e) => run(e.currentTarget, async () => {
+    await state.kb.setMacros(state.mc.list);
+    state.mc.dirty = false;
+    renderMacros();
+  }, 'Macros envoyées au clavier');
+}
+
+/** Délai saisi -> entier entre 0 et 9999 ms ; null si la saisie est vide ou non numérique. */
+function clampDelay(v) {
+  if (String(v).trim() === '') return null;
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(9999, Math.max(0, n)) : null;
+}
+
+async function ensureMacros() {
+  if (!state.kb || !state.kb.caps.macros || state.mc.loaded) return renderMacros();
+  await run(null, async () => {
+    state.mc.list = await state.kb.getMacros();
+    state.mc.loaded = true;
+    state.mc.dirty = false;
+  });
+  renderMacros();
+}
+
+/** Applique une modification à une copie de la liste ; refusée si elle dépasse la mémoire. */
+function mcEdit(fn) {
+  const next = JSON.parse(JSON.stringify(state.mc.list));
+  fn(next);
+  const used = macroUsage(next), size = state.kb.caps.macros.size;
+  if (used > size) { toast(`Plus de place : ${used} octets sur ${size}.`, true); renderMacros(); return; }
+  state.mc.list = next;
+  state.mc.dirty = true;
+  renderMacros();
+}
+
+function stepLabel(s) {
+  const mods = MOD_LABELS.filter(([bit]) => s.mods & bit).map(([, n]) => n);
+  return [...mods, actionLabel({ kind: 'keyboard', usage: s.key }, hidLabels())].join('+');
+}
+
+function macroTool(html, label, disabled, fn) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'icon-btn';
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  b.innerHTML = html;
+  b.disabled = disabled;
+  b.onclick = fn;
+  return b;
+}
+
+function renderMacros() {
+  const kb = state.kb;
+  const sup = !!(kb && kb.caps.macros);
+  $('#macros-unsupported').classList.toggle('hidden', sup);
+  $('#macros-body').classList.toggle('hidden', !sup);
+  if (!sup) {
+    $('#macros-unsupported-text').textContent = kb && isQ()
+      ? 'Ce firmware ne gère pas les macros. Elles demandent le firmware QMK Cadran à jour (dossier firmware du dépôt).'
+      : 'Les macros ne sont disponibles que sur le firmware QMK Cadran.';
+    return;
+  }
+  if (!state.mc.loaded) return;
+  const { list, sel } = state.mc;
+  const size = kb.caps.macros.size, used = macroUsage(list);
+
+  // Liste des macros
+  const box = $('#mc-list');
+  box.innerHTML = '';
+  list.forEach((m, n) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mc-item';
+    b.setAttribute('aria-pressed', String(n === sel));
+    const name = document.createElement('span');
+    name.className = 'mc-name';
+    name.textContent = `Macro ${n + 1}`;
+    const info = document.createElement('span');
+    info.className = 'note';
+    const count = m.steps.length;
+    info.textContent = !count && !m.tail.length ? 'vide' : `${count} étape${count > 1 ? 's' : ''}, ${encodeMacro(m).length} octets${m.tail.length ? ', non éditable' : ''}`;
+    b.append(name, info);
+    b.onclick = () => { state.mc.sel = n; renderMacros(); };
+    box.appendChild(b);
+  });
+
+  // Mémoire
+  const meter = $('#mc-meter');
+  meter.style.width = `${Math.min(100, (used / size) * 100)}%`;
+  meter.classList.toggle('over', used > size);
+  $('#mc-usage').textContent = `${used} / ${size} octets utilisés`;
+  $('#mc-usage').classList.toggle('warn', used > size);
+  $('#mc-send').disabled = used > size;
+  $('#mc-note').textContent = state.mc.dirty ? 'Modifié, pas encore envoyé' : '';
+
+  // Étapes de la macro choisie
+  const m = list[sel];
+  $('#mc-title').textContent = `Macro ${sel + 1}`;
+  $('#mc-count').textContent = `${m.steps.length} étape${m.steps.length > 1 ? 's' : ''}`;
+  const steps = $('#mc-steps');
+  steps.innerHTML = '';
+  if (!m.steps.length && !m.tail.length) {
+    const li = document.createElement('li');
+    li.className = 'step empty';
+    li.textContent = 'Aucune étape. Choisissez une touche ci-dessous.';
+    steps.appendChild(li);
+  }
+  m.steps.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.className = 'step';
+    const n = document.createElement('span');
+    n.className = 'step-n note';
+    n.textContent = String(i + 1);
+    const key = document.createElement('span');
+    key.className = 'step-key';
+    key.textContent = stepLabel(s);
+    const delay = document.createElement('input');
+    delay.type = 'number';
+    delay.min = '0'; delay.max = '9999'; delay.step = '1';
+    delay.value = String(s.delay);
+    delay.setAttribute('aria-label', `Délai après l'étape ${i + 1}, en ms`);
+    delay.onchange = () => {
+      const v = clampDelay(delay.value);
+      if (v === null) return renderMacros();
+      mcEdit((all) => { all[sel].steps[i].delay = v; });
+    };
+    const ms = document.createElement('span');
+    ms.className = 'note';
+    ms.textContent = 'ms';
+    const tools = document.createElement('span');
+    tools.className = 'step-tools';
+    tools.append(
+      macroTool(ICON_UP, `Monter l'étape ${i + 1}`, i === 0, () => mcEdit((all) => { const a = all[sel].steps; [a[i - 1], a[i]] = [a[i], a[i - 1]]; })),
+      macroTool(ICON_DOWN, `Descendre l'étape ${i + 1}`, i === m.steps.length - 1, () => mcEdit((all) => { const a = all[sel].steps; [a[i + 1], a[i]] = [a[i], a[i + 1]]; })),
+      macroTool(ICON_REMOVE, `Supprimer l'étape ${i + 1}`, false, () => mcEdit((all) => { all[sel].steps.splice(i, 1); })),
+    );
+    li.append(n, key, delay, ms, tools);
+    steps.appendChild(li);
+  });
+  if (m.tail.length) {
+    const li = document.createElement('li');
+    li.className = 'step na';
+    li.textContent = `Séquence non éditable : ${m.tail.length} octets, conservés en fin de macro.`;
+    steps.appendChild(li);
+  }
+
+  $$('#mc-mods button').forEach((b) => b.setAttribute('aria-pressed', String(!!(state.mc.mods & +b.dataset.mod))));
+  renderMacroKeys();
+}
+
+/** Choix de la touche d'une étape : mêmes listes que la réaffectation (touches du clavier, autres touches). */
+function renderMacroKeys() {
+  const box = $('#mc-keys');
+  const search = $('#mc-search').value.trim().toLowerCase();
+  const groups = [
+    ['Touches du clavier', [...hidLabels()]],
+    ['Autres touches', EXTRA_KEYS],
+  ];
+  box.innerHTML = '';
+  for (const [title, items] of groups) {
+    const shown = items.filter(([, l]) => !search || l.toLowerCase().includes(search));
+    if (!shown.length) continue;
+    const h = document.createElement('h3');
+    h.textContent = title;
+    box.appendChild(h);
+    const list = document.createElement('div');
+    list.className = 'list';
+    for (const [usage, label] of shown) {
+      const c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'chip';
+      c.textContent = label;
+      c.onclick = () => {
+        const mods = state.mc.mods;
+        state.mc.mods = 0;
+        mcEdit((all) => { all[state.mc.sel].steps.push({ mods, key: usage, delay: 0 }); });
+      };
       list.appendChild(c);
     }
     box.appendChild(list);
@@ -755,6 +957,7 @@ async function connect(devices) {
   state.kb = kb;
   keyTest(false);
   state.km = { layer: state.km.layer, device: {}, draft: {}, factory: {}, selected: null, testing: false };
+  state.mc = { loaded: false, list: [], sel: 0, mods: 0, dirty: false };
   onConnected();
   return true;
 }
@@ -828,6 +1031,7 @@ function boot() {
   initPerKey();
   initScreen();
   initKeymap();
+  initMacros();
   initSystem();
   $('#connect').onclick = requestConnect;
   $('#welcome-connect').onclick = requestConnect;

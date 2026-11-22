@@ -421,3 +421,132 @@ test('noms de couleurs, comme sur l\'écran du clavier', async () => {
   assert.equal(colorName('#000000'), 'Noir');
   assert.equal(colorName('zz'), '');
 });
+
+// ---------------------------------------------------------------- macros
+
+const ESC = 1, TAP = 1, DOWN = 2, UP = 3, DELAY = 4, BAR = 0x7c;
+const digits = (n) => Array.from(String(n), (d) => d.charCodeAt(0));
+const M = (steps, tail = []) => ({ steps, tail });
+
+test('macros : Ctrl+Maj+A avec délai 25 ms, octets exacts', () => {
+  const b = P.encodeMacroStep({ mods: 0x03, key: 0x04, delay: 25 });
+  assert.deepEqual(b, [ESC, DOWN, 0xe0, ESC, DOWN, 0xe1, ESC, TAP, 0x04, ESC, UP, 0xe0, ESC, UP, 0xe1, ESC, DELAY, ...digits(25), BAR]);
+  assert.deepEqual(P.encodeMacroStep({ key: 0x1e }), [ESC, TAP, 0x1e], 'sans modificateur ni délai : une seule touche');
+  assert.deepEqual(P.encodeMacroStep({ mods: 0x08, key: 0x2b }), [ESC, DOWN, 0xe3, ESC, TAP, 0x2b, ESC, UP, 0xe3]);
+});
+
+test('macros : aller-retour avec délais et modificateurs', () => {
+  const steps = [
+    { mods: 0, key: 0x04, delay: 0 },
+    { mods: 0x01, key: 0x06, delay: 50 },
+    { mods: 0x0f, key: 0x19, delay: 9999 },
+    { mods: 0x0c, key: 0xe1, delay: 1 },
+    { mods: 0x00, key: 0xa4, delay: 1234 },
+  ];
+  const bytes = P.encodeMacro(M(steps));
+  const back = P.decodeMacro(bytes);
+  assert.deepEqual(back.steps, steps);
+  assert.deepEqual(back.tail, []);
+  assert.deepEqual(P.encodeMacro(back), bytes);
+});
+
+test('macros : bornes des délais et des touches', () => {
+  assert.deepEqual(P.encodeMacroStep({ key: 4, delay: 9999 }).slice(-7), [ESC, DELAY, ...digits(9999), BAR]);
+  assert.deepEqual(P.encodeMacroStep({ key: 4, delay: 0 }), [ESC, TAP, 4], 'délai 0 : pas d\'octets de délai');
+  assert.throws(() => P.encodeMacroStep({ key: 4, delay: 10000 }), /0 à 9999/);
+  assert.throws(() => P.encodeMacroStep({ key: 4, delay: -1 }), /0 à 9999/);
+  assert.throws(() => P.encodeMacroStep({ key: 4, delay: 1.5 }), /0 à 9999/);
+  assert.throws(() => P.encodeMacroStep({ key: 0 }), /Touche hors plage/);
+  assert.throws(() => P.encodeMacroStep({ key: 0x03 }), /Touche hors plage/);
+  assert.throws(() => P.encodeMacroStep({ key: 0xa5 }), /Touche hors plage/);
+  assert.throws(() => P.encodeMacroStep({ key: undefined }), /Touche hors plage/);
+  assert.deepEqual(P.encodeMacroStep({ key: 0xe0 }), [ESC, TAP, 0xe0], 'modificateur utilisable comme touche');
+});
+
+test('macros : octets non éditables gardés en fin, sans perte', () => {
+  const raw = [ESC, TAP, 4, 0x99, 0x12];
+  const m = P.decodeMacro(raw);
+  assert.deepEqual(m.steps, [{ mods: 0, key: 4, delay: 0 }]);
+  assert.deepEqual(m.tail, [0x99, 0x12]);
+  assert.deepEqual(P.encodeMacro(m), raw);
+  // Délai écrit « 0 » : forme non canonique, donc non éditable.
+  const zero = [ESC, TAP, 4, ESC, DELAY, 0x30, BAR];
+  const z = P.decodeMacro(zero);
+  assert.equal(z.steps.length, 1);
+  assert.deepEqual(z.tail, [ESC, DELAY, 0x30, BAR]);
+  assert.deepEqual(P.encodeMacro(z), zero);
+  // Relâche sans appui : non éditable.
+  const up = [ESC, TAP, 4, ESC, UP, 0xe0];
+  assert.deepEqual(P.decodeMacro(up).tail, [ESC, UP, 0xe0]);
+  // Macro entièrement inconnue.
+  assert.deepEqual(P.decodeMacro([7, 7, 7]), M([], [7, 7, 7]));
+  assert.deepEqual(P.decodeMacro([]), M([], []));
+});
+
+test('macros : tampon, séparateurs 00 et dernier octet à 0', () => {
+  const macros = [M([{ mods: 1, key: 6, delay: 50 }]), M([]), M([{ mods: 0, key: 0x1e, delay: 0 }])];
+  for (let n = 0; n < 5; n++) macros.push(M([]));
+  const { buffer, used } = P.buildMacroBuffer(macros, 64);
+  assert.equal(buffer.length, 64);
+  assert.equal(buffer[63], 0);
+  assert.equal(used, P.macroUsage(macros));
+  assert.deepEqual(Array.from(buffer.slice(0, used)), [
+    ...P.encodeMacro(macros[0]), 0, 0, ...P.encodeMacro(macros[2]), 0, 0, 0, 0, 0, 0,
+  ]);
+  const back = P.parseMacroBuffer(buffer, 8);
+  assert.deepEqual(back.map((m) => m.steps), macros.map((m) => m.steps));
+});
+
+test('macros : tampon plein, dépassement refusé', () => {
+  // 18 étapes de 3 octets = 54, plus 8 séparateurs = 62 sur 64 : le dernier octet reste 00.
+  const step = { key: 4, delay: 0 };
+  const full = [M(Array.from({ length: 18 }, () => step)), M([]), M([]), M([]), M([]), M([]), M([]), M([])];
+  assert.equal(P.macroUsage(full), 62);
+  const { buffer } = P.buildMacroBuffer(full, 64);
+  assert.equal(buffer[63], 0);
+  assert.throws(() => P.buildMacroBuffer([M(Array.from({ length: 30 }, () => step))], 64), /trop longues/);
+});
+
+test('macros : lecture et écriture sur le faux clavier', async () => {
+  const { kb, mock, sent } = await openQ();
+  assert.deepEqual(kb.caps.macros, { count: 8, size: 512 });
+  const macros = await kb.getMacros();
+  assert.equal(macros.length, 8);
+  assert.deepEqual(macros[0].steps, [{ mods: 1, key: 0x06, delay: 50 }, { mods: 1, key: 0x19, delay: 0 }]);
+  assert.deepEqual(macros[7], M([]));
+
+  const edited = macros.map((m) => ({ steps: m.steps.map((s) => ({ ...s })), tail: [...m.tail] }));
+  edited[2] = M([{ mods: 2, key: 0x0b, delay: 9999 }, { mods: 0, key: 0x28, delay: 0 }]);
+  sent.length = 0;
+  await kb.setMacros(edited);
+  const writes = sent.filter((p) => p.data[2] === Q.QC.MACRO_SET);
+  assert.equal(writes.length, Math.ceil(512 / 26), 'tampon entier, par morceaux de 26 octets');
+  assert.ok(writes.every((p) => p.data[5] <= 26));
+  assert.equal(writes.at(-1).data[3] << 8 | writes.at(-1).data[4], 494, 'le dernier morceau vient en dernier');
+  assert.equal(mock.state.macros[511], 0);
+  assert.deepEqual(await kb.getMacros(), edited);
+  await assert.rejects(kb.setMacros(edited.slice(0, 3)), /8 macros/);
+});
+
+test('macros : firmware sans MACRO_INFO, familles A et B', async () => {
+  const mock = mockFamilyQ();
+  const orig = mock.devices[0].onReport;
+  mock.devices[0].onReport = (d, dev) => { if (d[1] === 0x14 && d[2] === Q.QC.MACRO_INFO) { const r = d.slice(0, 32); r[0] = 0xff; dev.emit(r); } else orig(d, dev); };
+  const kb = new P.Keyboard(P.classify(mock.devices));
+  await kb.open();
+  assert.equal(kb.caps.macros, null);
+  await assert.rejects(kb.getMacros(), /ne gère pas les macros/);
+  assert.equal((await openQ()).kb.caps.macros.count, 8);
+  const a = new P.Keyboard(P.classify(mockFamilyA(defaults).devices));
+  assert.equal(a.caps.macros, null);
+  const b = new P.Keyboard(P.classify(mockFamilyB().devices));
+  assert.equal(b.caps.macros, null);
+});
+
+test('macros : affectation à une touche, libellés 0x7700 + n', () => {
+  assert.equal(Q.QK_MACRO, 0x7700);
+  assert.equal(actionLabel({ kind: 'qmk', code: 0x7700 }, new Map()), 'Macro 1');
+  assert.equal(actionLabel({ kind: 'qmk', code: 0x7702 }, new Map()), 'Macro 3');
+  assert.equal(actionLabel({ kind: 'qmk', code: 0x7707 }, new Map()), 'Macro 8');
+  assert.equal(actionLabel({ kind: 'qmk', code: 0x7708 }, new Map()), 'Code 0x7708');
+});
