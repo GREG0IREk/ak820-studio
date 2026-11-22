@@ -5,3 +5,6 @@
 DYNAMIC_KEYMAP_ENABLE = yes
 RGB_MATRIX_CUSTOM_USER = yes
 SRC += studio.c
+
+# Clics et molette de souris : les macros les envoient (MS_BTN1..3, MS_WHLU/D).
+MOUSEKEY_ENABLE = yes

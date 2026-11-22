@@ -36,6 +36,8 @@
 // Macros (MC_0 à MC_7) : le tampon occupe ce qui reste de l'EEPROM après la keymap
 // (taille = DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE, voir nvm_dynamic_keymap.c). Rien d'existant n'est déplacé.
 #define DYNAMIC_KEYMAP_MACRO_COUNT 8
+// Durée d'un appui bref (macros) : assez longue pour qu'un clic soit vu par l'ordinateur.
+#define TAP_CODE_DELAY 10
 
 // EEPROM émulée en flash : 1 Ko par défaut ne suffit pas pour la keymap modifiable
 // (4 couches x 6 x 15 x 2 = 720 o) plus les couleurs par touche. 2 Ko logiques sur 4 Ko de flash.
