@@ -162,10 +162,10 @@ static void conn_tile(const char *txt) {
     ui_text(f_bold, 72, top + f_small->line_height + 2, txt, TEXT, TILE);
 }
 
-// Couleur de la pastille : gris pour « Éteint », orange pour « Arc-en-ciel ».
+// Couleur de la pastille : gris pour « Éteint », orange pour un effet multicolore.
 static col_t effect_dot(uint8_t i) {
     if (ui_effect_is_off(i)) return OFF_DOT;
-    if (strcmp(ui_effect_name(i), "Arc-en-ciel") == 0) return ORANGE;
+    if (ui_effect_rainbow(i)) return ORANGE;
     return ui_hue_color();
 }
 
@@ -297,7 +297,7 @@ static int16_t edit_value_mid(void) {
 }
 
 static painter_font_handle_t value_font(uint8_t item, const char *txt) {
-    bool numeric = item == IT_BRIGHT || item == IT_SPEED || item == IT_HUE ||
+    bool numeric = item == IT_BRIGHT || item == IT_SPEED ||
                    (item == IT_SLEEP && strcmp(txt, "Jamais") != 0);
     if (numeric && ui_text_width(f_value, txt) <= EDIT_TEXT_W) return f_value;
     if (ui_text_width(f_mid, txt) <= EDIT_TEXT_W) return f_mid;

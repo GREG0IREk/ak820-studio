@@ -93,6 +93,17 @@ void    rgb_matrix_set_speed_noeeprom(uint8_t s) { rgb_spd = s; }
 static uint8_t  fb[UI_H][UI_W][3];
 static uint16_t vp_l, vp_t, vp_r, vp_b, cur_x, cur_y;
 static uint32_t out_of_bounds = 0;
+static uint32_t n_pix = 0, n_rect = 0;   // coût d'un dessin : pixels envoyés, fenêtres ouvertes
+static uint8_t  touched[UI_H][UI_W];     // combien de fois chaque pixel a été écrit
+static void     cost_reset(void) { n_pix = n_rect = 0; memset(touched, 0, sizeof(touched)); }
+// Estimation : une fenêtre (3 commandes SPI) pèse environ 12 pixels.
+// « 2x » = pixels écrits plus d'une fois dans le même dessin (effacer puis réécrire) : à éviter.
+static void     cost_print(const char *name) {
+    unsigned twice = 0;
+    for (int y = 0; y < UI_H; y++)
+        for (int x = 0; x < UI_W; x++) twice += touched[y][x] > 1 ? touched[y][x] - 1 : 0;
+    printf("  . %-26s %5u px  %4u rect  coût %5u  2x %5u\n", name, (unsigned)n_pix, (unsigned)n_rect, (unsigned)(n_pix + 12 * n_rect), twice);
+}
 
 static bool d_init(painter_device_t d, painter_rotation_t r) { (void)d; (void)r; return true; }
 static bool d_power(painter_device_t d, bool on) { (void)d; (void)on; return true; }
@@ -101,14 +112,16 @@ static bool d_flush(painter_device_t d) { (void)d; return true; }
 static bool d_viewport(painter_device_t d, uint16_t l, uint16_t t, uint16_t r, uint16_t b) {
     (void)d;
     vp_l = l; vp_t = t; vp_r = r; vp_b = b;
+    n_rect++;
     cur_x = l; cur_y = t;
     return true;
 }
 static bool d_pixdata(painter_device_t d, const void *data, uint32_t count) {
     (void)d;
     const uint8_t *p = data;
+    n_pix += count;
     for (uint32_t i = 0; i < count; i++, p += 3) {
-        if (cur_x < UI_W && cur_y < UI_H) memcpy(fb[cur_y][cur_x], p, 3);
+        if (cur_x < UI_W && cur_y < UI_H) { memcpy(fb[cur_y][cur_x], p, 3); if (touched[cur_y][cur_x] < 255) touched[cur_y][cur_x]++; }
         else out_of_bounds++;
         if (++cur_x > vp_r) { cur_x = vp_l; cur_y++; }
     }
@@ -246,10 +259,12 @@ static void snap(const char *name) {
     save_scaled(path, &fb[0][0][0], 3);
     if (n_shots < MAX_SCENES) memcpy(shots[n_shots++], fb, sizeof(fb));
     printf("  %s\n", name);
+    cost_print(name);
 }
 
 // Dessin partiel, puis contrôle par un dessin complet de la même scène.
 static void partial(const char *name) {
+    cost_reset();
     redraw(false);
     static uint8_t part[UI_H][UI_W][3];
     memcpy(part, fb, sizeof(fb));
@@ -260,6 +275,7 @@ static void partial(const char *name) {
     for (int y = 0; y < UI_H; y++)
         for (int x = 0; x < UI_W; x++) {
             bool d = memcmp(part[y][x], fb[y][x], 3) != 0;
+            if (d && diff < 4) printf("    diff (%d,%d) partiel %02x%02x%02x complet %02x%02x%02x\n", x, y, part[y][x][0], part[y][x][1], part[y][x][2], fb[y][x][0], fb[y][x][1], fb[y][x][2]);
             diff += d;
             mask[y][x][0] = d ? 255 : fb[y][x][0] / 3;
             mask[y][x][1] = d ? 0 : fb[y][x][1] / 3;
@@ -275,6 +291,7 @@ static void partial(const char *name) {
 }
 
 static void full(const char *name) {
+    cost_reset();
     redraw(true);
     snap(name);
 }
@@ -306,6 +323,15 @@ static void run_theme(uint8_t idx, const char *dir) {
     full("accueil");
     sim_time.seconds = 43;
     partial("accueil-seconde");
+    sim_time.seconds = 0; sim_time.minutes = 38;
+    partial("accueil-minute");
+    sim_battery = 86;
+    partial("accueil-batterie");
+    sim_caps = true;
+    partial("accueil-maj");
+    sim_caps = false; sim_battery = 87;
+    sim_time = (rtc_time_t){43, 37, 14, 21, 6, 11, 2026};
+    partial("accueil-retour-base");
     sim_time = (rtc_time_t){7, 5, 9, 1, 2, 12, 2026};   // mar. 1 déc. 09:05:07
     sim_caps = true; connection_mode = CONN_BT; sim_slot = 2; sim_battery = 15;
     partial("accueil-bt-maj");
@@ -317,6 +343,7 @@ static void run_theme(uint8_t idx, const char *dir) {
     partial("accueil-retour");
 
     // Menu : ouverture puis un cran par entrée
+    cost_reset();
     display_menu_open();
     snap("menu-effet");
     for (uint8_t i = 1; i < IT_COUNT; i++) {
@@ -334,12 +361,16 @@ static void run_theme(uint8_t idx, const char *dir) {
     for (uint8_t i = 0; i < IT_COUNT; i++) {
         ui.sel    = i;
         ui.screen = SCR_MENU;
+        cost_reset();
         display_menu_press();
         char name[64];
         snprintf(name, sizeof(name), "reglage-%s", ITEM_FILE[i]);
         snap(name);
         if (i != IT_THEME) {
+            cost_reset();
             display_menu_rotate(true);
+            snprintf(name, sizeof(name), "cran %s", ITEM_FILE[i]);
+            cost_print(name);
             display_menu_rotate(true);
             // display_menu_rotate a déjà fait un dessin partiel ; on le contrôle.
             snprintf(name, sizeof(name), "reglage-%s-2", ITEM_FILE[i]);

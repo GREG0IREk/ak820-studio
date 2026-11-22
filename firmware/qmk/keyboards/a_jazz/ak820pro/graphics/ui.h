@@ -36,7 +36,7 @@ typedef struct {
     uint8_t     eff_idx;      // index dans la liste des effets (ui_effect_*)
     uint8_t     bright_pct;   // 0..100 par pas de 10
     uint8_t     speed_lvl;    // 1..5
-    uint16_t    hue_deg;      // 0..340 par pas de 20
+    uint8_t     hue_idx;      // couleur choisie : index dans la palette (ui_hue_name)
     uint8_t     sleep_idx;    // index du délai de veille (ui_sleep_minutes)
     uint8_t     theme_idx;    // interface choisie (ui_theme_name)
 } ui_state_t;
@@ -65,17 +65,20 @@ uint8_t     ui_effect_count(void);
 const char *ui_effect_name(uint8_t i);    // « Respiration »
 const char *ui_effect_short(uint8_t i);   // « Respir. » (8 caractères au plus)
 bool        ui_effect_is_off(uint8_t i);  // l'entrée « Éteint »
+bool        ui_effect_rainbow(uint8_t i); // effet multicolore : le réglage Couleur ne change rien
+uint8_t     ui_hue_count(void);
+const char *ui_hue_name(uint8_t i);       // « Rouge », « Bleu »… « Blanc » (dernier)
 uint8_t     ui_theme_count(void);
 const char *ui_theme_name(uint8_t i);     // « Cadran », « Terminal », « Tuiles »
 uint8_t     ui_sleep_count(void);
 uint8_t     ui_sleep_minutes(uint8_t i);  // 0 = jamais
 
-// Valeur d'une entrée en texte : « 80 % », « 3/5 », « 200° », « 5 min »,
+// Valeur d'une entrée en texte : « 80 % », « 3/5 », « Bleu », « 5 min »,
 // « Jamais », nom de l'effet (court si `brief`), nom de l'interface.
 void ui_value_text(uint8_t item, char *buf, size_t n, bool brief);
 // Position de la valeur dans sa plage, 0..1000 (pour un anneau ou une barre).
 uint16_t ui_value_permille(uint8_t item);
-// Couleur choisie (teinte du réglage Couleur, saturation et luminosité pleines).
+// Couleur choisie dans la palette, luminosité pleine (blanc : saturation 0).
 col_t ui_hue_color(void);
 
 // --- Dessin -----------------------------------------------------------------
@@ -91,8 +94,12 @@ int16_t ui_text_width(painter_font_handle_t f, const char *s);
 // ui_text / ui_image plutôt que par qp_drawtext_recolor / qp_drawimage_recolor.
 void    ui_text(painter_font_handle_t f, int16_t x, int16_t y, const char *s, col_t fg, col_t bg);
 void    ui_image(painter_image_handle_t img, int16_t x, int16_t y, col_t fg, col_t bg);
-// Efface [clear_x0, clear_x1] sur la hauteur de la police, puis centre le texte sur l'écran.
+// Texte centré sur l'écran, écrit EN PLACE : pas d'effacement préalable (voir ci-dessous),
+// seules les bandes de [clear_x0, clear_x1] que le texte ne recouvre pas sont repeintes en bg.
 void    ui_text_center(painter_font_handle_t f, int16_t y, int16_t clear_x0, int16_t clear_x1, const char *s, col_t fg, col_t bg);
+// Même chose, texte aligné dans [x0, x1] : UI_LEFT, UI_CENTER ou UI_RIGHT.
+typedef enum { UI_LEFT, UI_CENTER, UI_RIGHT } ui_align_t;
+void    ui_text_span(painter_font_handle_t f, int16_t x0, int16_t x1, ui_align_t align, int16_t y, const char *s, col_t fg, col_t bg);
 // Idem, texte aligné à droite sur x_right (dernier pixel inclus).
 void    ui_text_right(painter_font_handle_t f, int16_t x_right, int16_t y, const char *s, col_t fg, col_t bg);
 
@@ -104,8 +111,10 @@ void    ui_text_right(painter_font_handle_t f, int16_t x_right, int16_t y, const
 //   full = true  : tout redessiner (changement d'écran, réveil, changement d'interface) ;
 //   full = false : même écran, ne redessiner que ce qui a changé depuis le dernier appel
 //                  (accueil : chaque seconde ; menu et réglage : après un cran de molette).
-// Pas de tampon d'image : on dessine directement sur l'écran, en effaçant
-// chaque zone avec la couleur de fond avant d'y écrire.
+// Pas de tampon d'image : on dessine directement sur l'écran. Règle : ne jamais effacer
+// une zone pour la réécrire (écran vide visible, clignotement, deux fois plus de pixels).
+// Un texte ou une icône se dessine PAR-DESSUS l'ancien (leurs cellules sont pleines) ;
+// on ne repeint en fond que le reste (ui_text_span, ui_text_center), ou ce qui change de taille.
 
 typedef struct {
     const char *name;

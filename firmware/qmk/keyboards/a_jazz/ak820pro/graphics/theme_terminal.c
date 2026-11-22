@@ -233,7 +233,7 @@ static void edit_value(void) {
     strcpy(shown_value, buf);
 
     // Les nombres en grand ; un nom d'effet ou d'interface, ou un texte trop large, en moyen.
-    bool                  big = ui.sel != IT_EFFECT && ui.sel != IT_THEME && ui_text_width(f_big, buf) <= RIGHT_X - MARGIN_X - 8;
+    bool                  big = ui.sel != IT_EFFECT && ui.sel != IT_THEME && ui.sel != IT_HUE && ui_text_width(f_big, buf) <= RIGHT_X - MARGIN_X - 8;
     painter_font_handle_t f   = big ? f_big : f_mid;
     int16_t               y   = big ? value_y() : value_y() + (f_big->line_height - f_mid->line_height) / 2;
 
@@ -243,8 +243,8 @@ static void edit_value(void) {
 
 // Pastille de la couleur choisie, 40 × 6 px, sous la valeur (réglage Couleur seulement).
 static void edit_swatch(void) {
-    if (ui.sel != IT_HUE || ui.hue_deg == shown_hue) return;
-    shown_hue = ui.hue_deg;
+    if (ui.sel != IT_HUE || ui.hue_idx == shown_hue) return;
+    shown_hue = ui.hue_idx;
     ui_fill((UI_W - 40) / 2, swatch_y(), (UI_W - 40) / 2 + 39, swatch_y() + 5, ui_hue_color());
 }
 

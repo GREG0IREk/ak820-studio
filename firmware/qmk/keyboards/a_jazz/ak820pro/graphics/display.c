@@ -49,17 +49,31 @@ typedef struct {
     uint8_t     mode;
     const char *name;
     const char *brief;
+    bool        rainbow;   // les couleurs viennent de l'effet, pas du réglage Couleur
 } effect_t;
+// Mêmes noms que l'ancien logiciel Ajazz quand un effet équivalent existe.
+// Ne pas dépasser 14 caractères pour le nom (largeur de l'écran de réglage).
 static const effect_t EFFECTS[] = {
     {RGB_MATRIX_SOLID_COLOR, "Fixe", "Fixe"},
+    {RGB_MATRIX_SOLID_REACTIVE_SIMPLE, "Touche allumée", "Allumée"},
+    {RGB_MATRIX_CUSTOM_extinction, "Touche éteinte", "Éteinte"},
+    {RGB_MATRIX_STARLIGHT_SMOOTH, "Scintillement", "Scintil."},
+    {RGB_MATRIX_DIGITAL_RAIN, "Pluie", "Pluie"},
+    {RGB_MATRIX_JELLYBEAN_RAINDROPS, "Multicolore", "Multico.", true},
     {RGB_MATRIX_BREATHING, "Respiration", "Respir."},
-    {RGB_MATRIX_CYCLE_LEFT_RIGHT, "Vague", "Vague"},
-    {RGB_MATRIX_CYCLE_ALL, "Arc-en-ciel", "Arc-ciel"},
-    {RGB_MATRIX_CYCLE_PINWHEEL, "Spirale", "Spirale"},
-#ifdef ENABLE_RGB_MATRIX_SOLID_REACTIVE_SIMPLE
-    {RGB_MATRIX_SOLID_REACTIVE_SIMPLE, "Réactif", "Réactif"},
-#endif
-    {RGB_MATRIX_JELLYBEAN_RAINDROPS, "Pluie", "Pluie"},
+    {RGB_MATRIX_CYCLE_ALL, "Spectre", "Spectre", true},
+    {RGB_MATRIX_CYCLE_OUT_IN, "Vague centrale", "Centrale", true},
+    {RGB_MATRIX_CYCLE_UP_DOWN, "Défilement", "Défilem.", true},
+    {RGB_MATRIX_CYCLE_LEFT_RIGHT, "Roulement", "Roulem.", true},
+    {RGB_MATRIX_CYCLE_PINWHEEL, "Rotation", "Rotation", true},
+    {RGB_MATRIX_CYCLE_SPIRAL, "Spirale", "Spirale", true},
+    {RGB_MATRIX_MULTISPLASH, "Explosion", "Explos.", true},
+    {RGB_MATRIX_SOLID_REACTIVE_CROSS, "Lancement", "Lanc."},
+    {RGB_MATRIX_SOLID_SPLASH, "Ondulations", "Ondul."},
+    {RGB_MATRIX_RIVERFLOW, "Flux", "Flux", true},
+    {RGB_MATRIX_HUE_BREATHING, "Pulsation", "Pulsat."},
+    {RGB_MATRIX_HUE_PENDULUM, "Bascule", "Bascule"},
+    {RGB_MATRIX_DUAL_BEACON, "Navette", "Navette"},
     {RGB_MATRIX_TYPING_HEATMAP, "Chaleur", "Chaleur"},
 #ifdef AK820_STUDIO_PERKEY
     {RGB_MATRIX_CUSTOM_perso, "Personnalisé", "Perso"},
@@ -68,6 +82,19 @@ static const effect_t EFFECTS[] = {
 };
 #define EFFECT_COUNT ((uint8_t)(sizeof(EFFECTS) / sizeof(EFFECTS[0])))
 #define EFFECT_OFF   (EFFECT_COUNT - 1)
+
+// Couleurs du réglage « Couleur » : teinte et saturation QMK (0-255). Blanc en dernier.
+typedef struct {
+    uint8_t     h, s;
+    const char *name;
+} palette_t;
+static const palette_t PALETTE[] = {
+    {0, 255, "Rouge"},   {21, 255, "Orange"}, {43, 255, "Jaune"},  {64, 255, "Lime"},    {85, 255, "Vert"},
+    {106, 255, "Menthe"}, {128, 255, "Cyan"}, {149, 255, "Azur"},  {170, 255, "Bleu"},   {191, 255, "Violet"},
+    {213, 255, "Magenta"}, {234, 255, "Rose"}, {0, 0, "Blanc"},
+};
+#define PALETTE_COUNT ((uint8_t)(sizeof(PALETTE) / sizeof(PALETTE[0])))
+#define PALETTE_WHITE (PALETTE_COUNT - 1)
 
 static const ui_theme_t *const THEMES[] = {&theme_cadran, &theme_terminal, &theme_tuiles};
 #define THEME_COUNT ((uint8_t)(sizeof(THEMES) / sizeof(THEMES[0])))
@@ -83,6 +110,15 @@ const char *ui_effect_short(uint8_t i) {
 }
 bool ui_effect_is_off(uint8_t i) {
     return i == EFFECT_OFF;
+}
+bool ui_effect_rainbow(uint8_t i) {
+    return i < EFFECT_COUNT && EFFECTS[i].rainbow;
+}
+uint8_t ui_hue_count(void) {
+    return PALETTE_COUNT;
+}
+const char *ui_hue_name(uint8_t i) {
+    return i < PALETTE_COUNT ? PALETTE[i].name : "";
 }
 uint8_t ui_theme_count(void) {
     return THEME_COUNT;
@@ -159,9 +195,25 @@ void ui_image(painter_image_handle_t img, int16_t x, int16_t y, col_t fg, col_t 
     qp_drawimage_recolor(ui_dev, x, y, img, COL(fg), COL(bg));
 }
 
+// Dessin « en place » : les cellules de glyphes couvrent toute la hauteur de la police
+// et se touchent, donc un texte écrit par-dessus l'ancien le remplace sans trou.
+// On ne repeint en fond que ce que le nouveau texte ne recouvre pas, à gauche et à
+// droite, dans [x0, x1] : pas d'écran vide entre deux textes, donc pas de clignotement.
+static void draw_in_place(painter_font_handle_t f, int16_t x, int16_t y, int16_t x0, int16_t x1, const char *s, col_t fg, col_t bg) {
+    int16_t w = ui_text_width(f, s), yb = y + f->line_height - 1;
+    if (x - 1 >= x0) ui_fill(x0, y, x - 1, yb, bg);
+    if (x + w <= x1) ui_fill(x + w, y, x1, yb, bg);
+    ui_text(f, x, y, s, fg, bg);
+}
+
 void ui_text_center(painter_font_handle_t f, int16_t y, int16_t clear_x0, int16_t clear_x1, const char *s, col_t fg, col_t bg) {
-    ui_fill(clear_x0, y, clear_x1, y + f->line_height - 1, bg);
-    ui_text(f, (UI_W - ui_text_width(f, s)) / 2, y, s, fg, bg);
+    draw_in_place(f, (UI_W - ui_text_width(f, s)) / 2, y, clear_x0, clear_x1, s, fg, bg);
+}
+
+void ui_text_span(painter_font_handle_t f, int16_t x0, int16_t x1, ui_align_t align, int16_t y, const char *s, col_t fg, col_t bg) {
+    int16_t w = ui_text_width(f, s);
+    int16_t x = align == UI_LEFT ? x0 : align == UI_RIGHT ? x1 + 1 - w : (x0 + x1 + 1 - w) / 2;
+    draw_in_place(f, x, y, x0, x1, s, fg, bg);
 }
 
 void ui_text_right(painter_font_handle_t f, int16_t x_right, int16_t y, const char *s, col_t fg, col_t bg) {
@@ -179,24 +231,35 @@ static uint8_t effect_index_now(void) {
     return 0;
 }
 
+// Couleur de la palette la plus proche de l'éclairage actuel.
+static uint8_t palette_nearest(void) {
+    if (rgb_matrix_get_sat() < 128) return PALETTE_WHITE;
+    uint8_t h = rgb_matrix_get_hue(), best = 0, best_d = 255;
+    for (uint8_t i = 0; i < PALETTE_WHITE; i++) {
+        uint8_t d = (uint8_t)(h - PALETTE[i].h);
+        if (d > 127) d = (uint8_t)(256 - d);
+        if (d < best_d) {
+            best_d = d;
+            best   = i;
+        }
+    }
+    return best;
+}
+
 static void load_values(void) {
     ui.eff_idx    = effect_index_now();
     ui.bright_pct = (uint8_t)(((uint16_t)rgb_matrix_get_val() * 10 + RGB_MATRIX_MAXIMUM_BRIGHTNESS / 2) / RGB_MATRIX_MAXIMUM_BRIGHTNESS) * 10;
     ui.speed_lvl  = (uint8_t)((rgb_matrix_get_speed() + 25) / 51);
     if (ui.speed_lvl < 1) ui.speed_lvl = 1;
     if (ui.speed_lvl > 5) ui.speed_lvl = 5;
-    ui.hue_deg   = (uint16_t)((((uint32_t)rgb_matrix_get_hue() * 360 / 255) + 10) / 20 * 20) % 360;
+    ui.hue_idx   = palette_nearest();
     ui.sleep_idx = ak820_get_sleep_index();
     ui.theme_idx = ak820_get_theme_index();
     if (ui.theme_idx >= THEME_COUNT) ui.theme_idx = 0;
 }
 
-static uint8_t hue8(void) {
-    return (uint8_t)((uint32_t)ui.hue_deg * 255 / 360);
-}
-
 col_t ui_hue_color(void) {
-    return (col_t){hue8(), 255, 255};
+    return (col_t){PALETTE[ui.hue_idx].h, PALETTE[ui.hue_idx].s, 255};
 }
 
 void ui_value_text(uint8_t item, char *buf, size_t n, bool brief) {
@@ -204,7 +267,7 @@ void ui_value_text(uint8_t item, char *buf, size_t n, bool brief) {
         case IT_EFFECT: snprintf(buf, n, "%s", brief ? EFFECTS[ui.eff_idx].brief : EFFECTS[ui.eff_idx].name); break;
         case IT_BRIGHT: snprintf(buf, n, "%u %%", (unsigned)ui.bright_pct); break;
         case IT_SPEED: snprintf(buf, n, "%u/5", (unsigned)ui.speed_lvl); break;
-        case IT_HUE: snprintf(buf, n, "%u°", (unsigned)ui.hue_deg); break;
+        case IT_HUE: snprintf(buf, n, "%s", PALETTE[ui.hue_idx].name); break;
         case IT_SLEEP: {
             uint8_t m = ak820_sleep_minutes(ui.sleep_idx);
             if (m) snprintf(buf, n, "%u min", (unsigned)m);
@@ -221,7 +284,7 @@ uint16_t ui_value_permille(uint8_t item) {
         case IT_EFFECT: return (uint16_t)((uint32_t)ui.eff_idx * 1000 / (EFFECT_COUNT - 1));
         case IT_BRIGHT: return (uint16_t)ui.bright_pct * 10;
         case IT_SPEED: return (uint16_t)(ui.speed_lvl - 1) * 250;
-        case IT_HUE: return (uint16_t)((uint32_t)ui.hue_deg * 1000 / 340);
+        case IT_HUE: return (uint16_t)((uint32_t)ui.hue_idx * 1000 / (PALETTE_COUNT - 1));
         case IT_SLEEP: return (uint16_t)((uint32_t)ui.sleep_idx * 1000 / (AK820_SLEEP_CHOICES - 1));
         case IT_THEME: return THEME_COUNT > 1 ? (uint16_t)((uint32_t)ui.theme_idx * 1000 / (THEME_COUNT - 1)) : 1000;
         default: return 0;
@@ -244,12 +307,9 @@ static void apply_live(void) {
         case IT_SPEED:
             rgb_matrix_set_speed_noeeprom(ui.speed_lvl * 51);
             break;
-        case IT_HUE: {
-            uint8_t sat = rgb_matrix_get_sat();
-            if (sat < 128) sat = 255;   // sur du blanc, la teinte ne se verrait pas
-            rgb_matrix_sethsv_noeeprom(hue8(), sat, rgb_matrix_get_val());
+        case IT_HUE:
+            rgb_matrix_sethsv_noeeprom(PALETTE[ui.hue_idx].h, PALETTE[ui.hue_idx].s, rgb_matrix_get_val());
             break;
-        }
         default:
             break;
     }
@@ -342,7 +402,7 @@ void display_menu_rotate(bool clockwise) {
                 if (d > 0 && ui.speed_lvl < 5) ui.speed_lvl++;
                 if (d < 0 && ui.speed_lvl > 1) ui.speed_lvl--;
                 break;
-            case IT_HUE: ui.hue_deg = (uint16_t)((ui.hue_deg + 360 + d * 20) % 360); break;
+            case IT_HUE: ui.hue_idx = (uint8_t)((ui.hue_idx + PALETTE_COUNT + d) % PALETTE_COUNT); break;
             case IT_SLEEP: ui.sleep_idx = (uint8_t)((ui.sleep_idx + AK820_SLEEP_CHOICES + d) % AK820_SLEEP_CHOICES); break;
             case IT_THEME:
                 // Aperçu immédiat : l'écran de réglage est redessiné dans la nouvelle interface.

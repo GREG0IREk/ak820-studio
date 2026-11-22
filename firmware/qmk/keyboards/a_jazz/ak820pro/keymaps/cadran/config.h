@@ -2,9 +2,21 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
-// Effet « Réactif » du menu : les touches s'allument quand on les frappe.
+// Effets du menu en plus de ceux du portage (keyboard.json). Les effets réactifs
+// (frappe) ont besoin de RGB_MATRIX_KEYPRESSES.
 #define RGB_MATRIX_KEYPRESSES
 #define ENABLE_RGB_MATRIX_SOLID_REACTIVE_SIMPLE
+#define ENABLE_RGB_MATRIX_SOLID_REACTIVE_CROSS
+#define ENABLE_RGB_MATRIX_SOLID_SPLASH
+#define ENABLE_RGB_MATRIX_MULTISPLASH
+#define ENABLE_RGB_MATRIX_STARLIGHT_SMOOTH
+#define ENABLE_RGB_MATRIX_DIGITAL_RAIN
+#define ENABLE_RGB_MATRIX_RIVERFLOW
+#define ENABLE_RGB_MATRIX_CYCLE_OUT_IN
+#define ENABLE_RGB_MATRIX_CYCLE_SPIRAL
+#define ENABLE_RGB_MATRIX_HUE_BREATHING
+#define ENABLE_RGB_MATRIX_HUE_PENDULUM
+#define ENABLE_RGB_MATRIX_DUAL_BEACON
 
 // Version renvoyée par la commande système 0x13/0x02 (outil de mise à jour).
 #define AK820_FW_VERSION "cadran-1.2"

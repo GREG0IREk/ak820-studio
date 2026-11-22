@@ -264,7 +264,7 @@ static void edit_value(bool full) {
     strcpy(shown_value, buf);
 
     ui_fill(15, EDIT_VALUE_Y, 113, EDIT_VALUE_Y + f_big->line_height - 1, BG);
-    bool                  big = ui.sel != IT_EFFECT && ui.sel != IT_THEME && ui_text_width(f_big, buf) <= 96;
+    bool                  big = ui.sel != IT_EFFECT && ui.sel != IT_THEME && ui.sel != IT_HUE && ui_text_width(f_big, buf) <= 96;
     painter_font_handle_t f   = big ? f_big : f_mid;
     int16_t               y   = big ? EDIT_VALUE_Y : EDIT_VALUE_Y + (f_big->line_height - f_mid->line_height) / 2;
     ui_text(f, (UI_W - ui_text_width(f, buf)) / 2, y, buf, TEXT, BG);
