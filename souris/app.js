@@ -1,4 +1,4 @@
-import * as P from './protocol.js';
+import * as P from './protocol.js?v=2';
 
 const $ = (s) => document.querySelector(s);
 const ICON_INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
