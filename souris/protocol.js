@@ -88,6 +88,7 @@ export function parseSettings(r) {
   }
   return {
     lightMode: r[9],
+    lightExtra: Array.from(r.slice(43, 48)), // octets 43-47 : non écrits par le logiciel Ajazz, rôle à établir
     rate: r[10],
     dpiCount: r[11],
     dpiIndex: Math.max(0, Math.min(5, r[12] - 1)),
@@ -123,6 +124,7 @@ export function writeSettings(s, p = 0) {
     b[18 + 3 * i] = c[1];
     b[19 + 3 * i] = c[2];
   }
+  if (s.lightExtra) s.lightExtra.forEach((v, i) => { b[35 + i] = v & 0xff; });
   b[40] = s.scrollReverse ? 1 : 0;
   b[41] = s.lod;
   b[42] = s.sensor & 0xff;
@@ -145,7 +147,8 @@ export function clampDpi(v) {
 export const liveDpi = (index, value, p = 0) => frame(CMD.DPI_LIVE, 0xae, 3, [0, 0, index + 1, value & 0xff, value >> 8], p);
 export const liveRate = (rate, p = 0) => frame(CMD.RATE_LIVE, 0xae, 3, [0, 0, rate], p);
 // Le mode écrit par 0x0F n'est appliqué qu'au prochain démarrage : 0x21 le change tout de suite.
-export const liveLight = (mode, p = 0) => frame(CMD.LIGHT_LIVE, 0xa5, 3, [0, 0, mode], p);
+// extra : octets 11 et suivants, non envoyés par le logiciel Ajazz (à l'essai).
+export const liveLight = (mode, p = 0, extra = []) => frame(CMD.LIGHT_LIVE, 0xa5, 3 + extra.length, [0, 0, mode, ...extra], p);
 
 // ---------- boutons (commande 0x08 / 0x09) : 9 emplacements de 4 octets
 

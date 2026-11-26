@@ -37,11 +37,27 @@
   .field > label.switch { display: inline-flex; font-size: inherit; color: inherit; margin-bottom: 0; }
   .field > label.switch + .note { margin-top: 4px; padding-left: 46px; }
   .buttons + .field { margin-top: 16px; }
+  .card.narrow { max-width: 640px; }
+  .effects { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .effects button { min-height: 44px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); text-align: left; font: inherit; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .effects button[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-soft); font-weight: 550; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+  .tint { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; }
+  .tint.active { border-color: var(--accent); background: var(--accent-soft); }
+  .tint .led { width: 28px; height: 28px; }
+  .tint .led input { width: 36px; height: 36px; }
+  .tint small { display: block; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .trial { gap: 24px; margin-top: 12px; }
+  .tv { display: grid; grid-template-columns: 110px minmax(0, 1fr) 64px; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; }
+  #trial-live + .field, #trial-block + .field { margin-top: 16px; }
+  .tv input[type='number'] { width: 100%; min-height: 32px; padding: 0 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); text-align: right; }
   @media (max-width: 720px) {
     .level { grid-template-columns: auto auto minmax(0, 1fr); }
     .dpi-val { justify-self: end; }
     .level input[type='range'] { grid-column: 1 / -1; grid-row: 2; }
     .bt { grid-template-columns: minmax(0, 1fr); }
+    .swatches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tv { grid-template-columns: 90px minmax(0, 1fr) 60px; }
   }
 </style>
 </head>
@@ -64,6 +80,7 @@
     <button data-view="perf" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M3.3 19a9 9 0 1 1 17.4 0"/></svg>Performances</button>
     <button data-view="sensor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Capteur</button>
     <button data-view="buttons"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10l-3-3M17 17H7l3 3"/></svg>Boutons</button>
+    <button data-view="light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V18h6v-1.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/></svg>Éclairage</button>
     <button data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Réglages</button>
     <button data-view="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>Système</button>
   </nav>
@@ -107,21 +124,49 @@
       </div>
     </section>
 
+    <section class="view" id="view-light">
+      <h1>Éclairage</h1>
+      <p class="lead">Chaque changement est envoyé à la souris et appliqué tout de suite.</p>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Effet</h2>
+          <div class="effects" id="effects"></div>
+          <p class="note">Noms repris du logiciel Ajazz, pas encore vérifiés un par un sur la souris.</p>
+        </div>
+        <div class="card">
+          <h2>Couleur par palier DPI</h2>
+          <div class="swatches" id="swatches"></div>
+          <p class="note">Le témoin flashe cette couleur au changement de palier. Damier = couleur d'origine.</p>
+          <div class="field row"><button class="btn" id="colors-reset">Couleurs d'origine</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>À l'essai : luminosité, vitesse, couleur</h2>
+        <p class="note">Le logiciel Ajazz prévoit une luminosité, une vitesse, un sens et une couleur par effet, mais ne les envoie pas à cette souris. Ces réglages écrivent là où ils pourraient se trouver. Change une valeur et regarde si le témoin réagit.</p>
+        <div class="grid-2 trial">
+          <div>
+            <div class="label">A. Envoyés avec l'effet (octets 11 à 16, non enregistrés)</div>
+            <div id="trial-live"></div>
+            <div class="field row"><button class="btn primary" id="trial-live-send">Envoyer</button><button class="btn" id="trial-live-clear">Sans paramètres</button></div>
+          </div>
+          <div>
+            <div class="label">B. Bloc de réglages (octets 43 à 47, enregistrés)</div>
+            <div id="trial-block"></div>
+            <div class="field row"><button class="btn" id="trial-block-reset">Remettre à 0</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="view" id="view-settings">
       <h1>Réglages</h1>
       <p class="lead">Chaque changement est enregistré dans la souris.</p>
-      <div class="grid-2">
-        <div class="card">
+      <div class="card narrow">
           <div class="field"><div class="label">Anti-rebond des clics : <b id="debounce-v"></b></div><input type="range" id="debounce" min="0" max="20" step="1"></div>
           <div class="field"><div class="label">Mise en veille après</div><div class="seg" id="sleep"></div></div>
           <div class="field"><label class="switch"><input type="checkbox" id="esports"> Mode e-sport</label><div class="note">Capteur toujours actif : réactivité maximale, autonomie réduite.</div></div>
           <div class="field"><label class="switch"><input type="checkbox" id="wake"> Réveil en bougeant la souris</label></div>
           <div class="field"><label class="switch"><input type="checkbox" id="scroll"> Inverser la molette</label></div>
-        </div>
-        <div class="card">
-          <div class="field"><label for="light">Éclairage du témoin</label><select id="light"></select></div>
-          <p class="note">Le témoin au-dessus de la molette prend la couleur du palier DPI.</p>
-        </div>
       </div>
     </section>
 
@@ -143,6 +188,7 @@
     </section>
   </main>
 </div>
-<script type="module" src="app.js?v=2"></script>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="app.js?v=3"></script>
 </body>
 </html>

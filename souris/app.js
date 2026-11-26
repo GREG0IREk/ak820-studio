@@ -1,4 +1,4 @@
-import * as P from './protocol.js?v=2';
+import * as P from './protocol.js?v=3';
 
 const $ = (s) => document.querySelector(s);
 const ICON_INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
@@ -153,19 +153,24 @@ async function refreshBattery() {
 // ---------- enregistrement
 
 let saveTimer = null;
-function saveSettings(delay = 350) {
+// relight : renvoie le mode d'éclairage après l'écriture, pour que la souris relise ses paramètres.
+let relightPending = false;
+function saveSettings(delay = 350, relight = false) {
+  if (!link) return;
+  relightPending ||= relight;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
       const r = await link.send(P.writeSettings(state.settings));
       if (!P.isReply(r, P.CMD.SETTINGS_WRITE)) throw new Error('réponse inattendue');
+      if (relightPending) { relightPending = false; await link.send(P.liveLight(state.settings.lightMode)); }
       const back = P.parseSettings(await link.send(P.readSettings()));
       const same = back.dpi.every((v, i) => v === P.clampDpi(state.settings.dpi[i])) && back.rate === state.settings.rate && back.sensor === state.settings.sensor;
       state.settings = back;
       render();
       flash(same ? 'Enregistré dans la souris' : 'La souris a corrigé certaines valeurs');
     } catch (e) {
-      banner(`Échec de l'enregistrement : ${e.message}`, true);
+      flash(`Échec de l'enregistrement : ${e.message}`, true);
     }
   }, delay);
 }
@@ -177,7 +182,7 @@ async function saveKeys() {
     renderButtons();
     flash('Boutons enregistrés');
   } catch (e) {
-    banner(`Échec de l'enregistrement : ${e.message}`, true);
+    flash(`Échec de l'enregistrement : ${e.message}`, true);
   }
 }
 
@@ -190,6 +195,7 @@ function render() {
   renderSensor();
   renderButtons();
   renderSettings();
+  renderLight();
   renderInfo();
 }
 
@@ -210,13 +216,10 @@ function renderLevels() {
   s.dpi.forEach((v, i) => {
     const row = document.createElement('div');
     row.className = 'level' + (i === s.dpiIndex ? ' active' : '');
-    const c = s.colors[i];
-    const col = '#' + c.map((x) => x.toString(16).padStart(2, '0')).join('');
-    const unset = c.every((x) => x === 0); // 000000 = couleur d'origine du firmware
     row.innerHTML = `<button class="pick" aria-label="Utiliser le palier ${i + 1}" aria-pressed="${i === s.dpiIndex}"><i></i></button>
       <span class="n">Palier ${i + 1}</span>
       <input type="range" min="${P.DPI_MIN}" max="${P.DPI_MAX}" step="50" value="${v}" aria-label="DPI du palier ${i + 1}">
-      <div class="dpi-val"><span class="led${unset ? ' unset' : ''}" style="${unset ? '' : 'background:' + col}" title="${unset ? 'Couleur d\'origine' : col}"><input type="color" value="${unset ? '#ffffff' : col}" aria-label="Couleur du témoin, palier ${i + 1}"></span><input type="number" min="${P.DPI_MIN}" max="${P.DPI_MAX}" step="50" value="${v}" aria-label="DPI du palier ${i + 1}"></div>`;
+      <div class="dpi-val">${ledHtml(s.colors[i], `Couleur du témoin, palier ${i + 1}`)}<input type="number" min="${P.DPI_MIN}" max="${P.DPI_MAX}" step="50" value="${v}" aria-label="DPI du palier ${i + 1}"></div>`;
     const [range, num] = row.querySelectorAll('input[type=range], input[type=number]');
     range.addEventListener('input', () => { num.value = range.value; });
     range.addEventListener('change', () => { s.dpi[i] = P.clampDpi(+range.value); saveSettings(); });
@@ -226,13 +229,7 @@ function renderLevels() {
       box.querySelectorAll('.level').forEach((el, j) => { el.classList.toggle('active', j === i); el.querySelector('.pick').setAttribute('aria-pressed', j === i); });
       saveSettings(0);
     });
-    const color = row.querySelector('input[type=color]');
-    color.addEventListener('input', () => { color.parentElement.classList.remove('unset'); color.parentElement.style.background = color.value; });
-    color.addEventListener('change', () => {
-      const h = color.value.slice(1);
-      s.colors[i] = [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16));
-      saveSettings();
-    });
+    bindLed(row.querySelector('input[type=color]'), i);
     box.appendChild(row);
   });
 }
@@ -282,14 +279,87 @@ function renderSettings() {
   sw('#esports', 'esports');
   sw('#wake', 'wakeOnMove');
   sw('#scroll', 'scrollReverse');
-  const light = $('#light');
-  light.innerHTML = P.LIGHT_MODES.map((m, i) => `<option value="${i}">${m}</option>`).join('');
-  light.value = s.lightMode;
-  light.onchange = async () => {
-    s.lightMode = +light.value;
-    try { await link.send(P.liveLight(s.lightMode)); } catch (e) { return banner(`Échec du changement d'éclairage : ${e.message}`, true); }
-    saveSettings(0);
-  };
+}
+
+// ---------- éclairage
+
+const toHex = (c) => '#' + c.map((x) => x.toString(16).padStart(2, '0')).join('');
+const fromHex = (h) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
+
+function ledHtml(c, label) {
+  const unset = c.every((x) => x === 0); // 000000 = couleur d'origine du firmware
+  return `<span class="led${unset ? ' unset' : ''}" style="${unset ? '' : 'background:' + toHex(c)}" title="${unset ? 'Couleur d\'origine' : toHex(c)}"><input type="color" value="${unset ? '#ffffff' : toHex(c)}" aria-label="${label}"></span>`;
+}
+
+function bindLed(input, i) {
+  input.addEventListener('input', () => { input.parentElement.classList.remove('unset'); input.parentElement.style.background = input.value; });
+  input.addEventListener('change', () => { state.settings.colors[i] = fromHex(input.value); saveSettings(); });
+}
+
+async function setEffect(mode) {
+  const s = state.settings;
+  s.lightMode = mode;
+  try {
+    await link.send(P.liveLight(mode));
+    flash(`Effet : ${P.LIGHT_MODES[mode]}`);
+  } catch (e) {
+    flash(`Échec du changement d'éclairage : ${e.message}`, true);
+  }
+}
+
+// Valeurs de l'essai A (non enregistrées dans la souris, gardées pendant la visite).
+const TRIAL_LIVE = ['Luminosité ?', 'Vitesse ?', 'Sens ?'];
+const trialLive = { values: [0, 0, 0], color: '#ff0000' };
+
+function trialRow(label, value, onChange) {
+  const row = document.createElement('div');
+  row.className = 'tv';
+  row.innerHTML = `<span>${label}</span><input type="range" min="0" max="255" value="${value}" aria-label="${label}"><input type="number" min="0" max="255" value="${value}" aria-label="${label}">`;
+  const [range, num] = row.querySelectorAll('input');
+  range.addEventListener('input', () => { num.value = range.value; });
+  range.addEventListener('change', () => onChange(+range.value));
+  num.addEventListener('change', () => { const v = Math.max(0, Math.min(255, +num.value | 0)); num.value = v; range.value = v; onChange(v); });
+  return row;
+}
+
+function renderLight() {
+  const s = state.settings;
+  const fx = $('#effects');
+  fx.innerHTML = '';
+  P.LIGHT_MODES.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.setAttribute('aria-pressed', i === s.lightMode);
+    b.addEventListener('click', () => {
+      fx.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+      setEffect(i);
+    });
+    fx.appendChild(b);
+  });
+
+  const sw = $('#swatches');
+  sw.innerHTML = '';
+  s.colors.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'tint' + (i === s.dpiIndex ? ' active' : '');
+    el.innerHTML = `${ledHtml(c, `Couleur du palier ${i + 1}`)}<div>Palier ${i + 1}<small>${s.dpi[i]} DPI</small></div>`;
+    bindLed(el.querySelector('input'), i);
+    sw.appendChild(el);
+  });
+
+  const live = $('#trial-live');
+  live.innerHTML = '';
+  TRIAL_LIVE.forEach((label, k) => live.appendChild(trialRow(label, trialLive.values[k], (v) => { trialLive.values[k] = v; })));
+  const crow = document.createElement('div');
+  crow.className = 'tv';
+  crow.innerHTML = `<span>Couleur ?</span><span class="led" style="background:${trialLive.color}"><input type="color" value="${trialLive.color}" aria-label="Couleur à essayer"></span><span></span>`;
+  const ci = crow.querySelector('input');
+  ci.addEventListener('input', () => { ci.parentElement.style.background = ci.value; trialLive.color = ci.value; });
+  live.appendChild(crow);
+
+  const block = $('#trial-block');
+  block.innerHTML = '';
+  s.lightExtra.forEach((v, k) => block.appendChild(trialRow(`Octet ${43 + k}`, v, (nv) => { s.lightExtra[k] = nv; saveSettings(0, true); })));
 }
 
 function renderButtons() {
@@ -375,11 +445,15 @@ function banner(html, warn = false) {
   $('#banner').innerHTML = html ? `<div class="banner${warn ? ' warn' : ''}">${ICON_INFO}<span>${html}</span></div>` : '';
 }
 
+// Message flottant : ne décale pas le contenu de la page.
 let flashTimer = null;
-function flash(msg) {
-  banner(msg);
+function flash(msg, err = false) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('err', err);
+  t.classList.add('show');
   clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => banner(state.demo ? `Mode démo : une fausse souris répond aux commandes. <a href="?">Quitter la démo</a>` : ''), 1800);
+  flashTimer = setTimeout(() => t.classList.remove('show'), err ? 6000 : 1800);
 }
 
 // ---------- navigation et démarrage
@@ -400,7 +474,15 @@ const startView = new URLSearchParams(location.search).get('vue') || location.ha
 if (startView) showView(startView);
 
 $('#connect').addEventListener('click', connect);
-$('#reload').addEventListener('click', () => link && readAll().then(() => flash('Réglages relus')).catch((e) => banner(e.message, true)));
+$('#reload').addEventListener('click', () => link && readAll().then(() => flash('Réglages relus')).catch((e) => flash(e.message, true)));
+$('#colors-reset').addEventListener('click', () => { if (!link) return; state.settings.colors = state.settings.colors.map(() => [0, 0, 0]); saveSettings(0); });
+$('#trial-live-send').addEventListener('click', async () => {
+  if (!link) return;
+  const extra = [...trialLive.values, ...fromHex(trialLive.color)];
+  try { await link.send(P.liveLight(state.settings.lightMode, 0, extra)); flash(`Envoyé : effet ${state.settings.lightMode}, ${extra.join(' ')}`); } catch (e) { flash(e.message, true); }
+});
+$('#trial-live-clear').addEventListener('click', () => link && setEffect(state.settings.lightMode));
+$('#trial-block-reset').addEventListener('click', () => { if (!link) return; state.settings.lightExtra = [0, 0, 0, 0, 0]; saveSettings(0, true); });
 $('#keys-reset').addEventListener('click', () => { if (!link) return; state.keys = P.DEFAULT_KEYS.map((k) => k.slice()); saveKeys(); });
 $('#export').addEventListener('click', () => {
   if (!state.settings) return;

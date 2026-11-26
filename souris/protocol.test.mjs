@@ -78,3 +78,15 @@ test('éclairage immédiat : trame acceptée par la souris le 26/11/2026', () =>
   assert.equal(P.liveLight(6)[10], 6);
   assert.equal(P.liveLight(6)[3], 9);
 });
+
+test('éclairage : octets 43-47 conservés et réécrits', () => {
+  const s = P.parseSettings(SETTINGS);
+  assert.deepEqual(s.lightExtra, [0, 0, 0, 0, 0]);
+  s.lightExtra = [1, 2, 3, 4, 5];
+  const r = P.writeSettings(s); r[0] = 0xaa; r[1] = 0x0e;
+  assert.deepEqual(P.parseSettings(r).lightExtra, [1, 2, 3, 4, 5]);
+  assert.equal(r[48], 0); // molette inchangée
+  const f = P.liveLight(2, 0, [10, 20, 30, 255, 0, 0]);
+  assert.deepEqual(Array.from(f.slice(8, 17)), [0, 0, 2, 10, 20, 30, 255, 0, 0]);
+  assert.equal(f[4], 9);
+});
