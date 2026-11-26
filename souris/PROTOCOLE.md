@@ -30,7 +30,7 @@ somme  = (octets 4 à 63 additionnés) & 0xFF
 | 0F | AE | 30 | écriture des réglages (même disposition que 0E) |
 | 08 | A5 | 20 | lecture des 9 boutons |
 | 09 | A5 | 20 | écriture des 9 boutons |
-| 21 | A5 | 03 | mode d'éclairage immédiat (octet 10) |
+| 21 | A5 | 03 | mode d'éclairage immédiat (octet 10) ; sans elle, le mode écrit par 0F ne s'applique pas tout de suite |
 | 22 | AE | 03 | palier DPI immédiat : octet 10 = palier + 1, 11-12 = DPI |
 | 23 | AE | 03 | taux de rapport immédiat (octet 10) |
 | 0D, 10 | | | macros (blocs de 56 octets, non utilisé ici) |
