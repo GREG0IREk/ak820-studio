@@ -285,7 +285,11 @@ function renderSettings() {
   const light = $('#light');
   light.innerHTML = P.LIGHT_MODES.map((m, i) => `<option value="${i}">${m}</option>`).join('');
   light.value = s.lightMode;
-  light.onchange = () => { s.lightMode = +light.value; saveSettings(0); };
+  light.onchange = async () => {
+    s.lightMode = +light.value;
+    try { await link.send(P.liveLight(s.lightMode)); } catch (e) { return banner(`Échec du changement d'éclairage : ${e.message}`, true); }
+    saveSettings(0);
+  };
 }
 
 function renderButtons() {

@@ -144,6 +144,8 @@ export function clampDpi(v) {
 // Réglages appliqués sans réécrire le bloc (utilisés par le logiciel pour les boutons DPI / taux).
 export const liveDpi = (index, value, p = 0) => frame(CMD.DPI_LIVE, 0xae, 3, [0, 0, index + 1, value & 0xff, value >> 8], p);
 export const liveRate = (rate, p = 0) => frame(CMD.RATE_LIVE, 0xae, 3, [0, 0, rate], p);
+// Le mode écrit par 0x0F n'est appliqué qu'au prochain démarrage : 0x21 le change tout de suite.
+export const liveLight = (mode, p = 0) => frame(CMD.LIGHT_LIVE, 0xa5, 3, [0, 0, mode], p);
 
 // ---------- boutons (commande 0x08 / 0x09) : 9 emplacements de 4 octets
 

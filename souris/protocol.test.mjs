@@ -72,3 +72,9 @@ test('boutons : lecture, noms et réécriture à l\'identique', () => {
   assert.deepEqual(Array.from(w.slice(8, 44)), Array.from(KEYS.slice(8, 44)));
   assert.equal(w[1], 0x09);
 });
+
+test('éclairage immédiat : trame acceptée par la souris le 26/11/2026', () => {
+  assert.deepEqual(Array.from(P.liveLight(0).slice(0, 11)), [0x55, 0x21, 0xa5, 0x03, 0x03, 0, 0, 0, 0, 0, 0]);
+  assert.equal(P.liveLight(6)[10], 6);
+  assert.equal(P.liveLight(6)[3], 9);
+});
