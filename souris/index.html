@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AJ139 Studio</title>
+<meta name="description" content="Réglages de la souris Ajazz AJ139 V2 MC dans le navigateur : DPI, taux de rapport, capteur, boutons, veille.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b4cdb' stroke-width='2' stroke-linecap='round'%3E%3Crect x='6' y='2' width='12' height='20' rx='6'/%3E%3Cpath d='M12 6v4'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../src/style.css">
+<style>
+  .levels { display: grid; gap: 8px; }
+  .level { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; transition: border-color 0.15s, background 0.15s; }
+  .level.active { border-color: var(--accent); background: var(--accent-soft); }
+  .level .pick { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); background: var(--panel); padding: 0; display: grid; place-items: center; }
+  .level.active .pick { border-color: var(--accent); }
+  .level .pick i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); transform: scale(0); transition: transform 0.15s; }
+  .level.active .pick i { transform: scale(1); }
+  .level .n { font-size: 13px; color: var(--muted); min-width: 52px; }
+  .level input[type='number'] { width: 100%; min-height: 34px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); text-align: right; font-variant-numeric: tabular-nums; }
+  .dpi-val { display: flex; align-items: center; gap: 8px; }
+  .dpi-val input[type='number'] { width: 92px; }
+  .led { flex: none; position: relative; width: 22px; height: 22px; border-radius: 50%; box-shadow: 0 0 0 1px var(--line); overflow: hidden; }
+  .led.unset { background: repeating-conic-gradient(var(--line) 0 25%, var(--panel) 0 50%) 50% / 8px 8px; }
+  .led input { position: absolute; inset: -4px; width: 30px; height: 30px; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+  .buttons { display: grid; gap: 8px; }
+  .bt { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; }
+  .bt .name { font-weight: 550; }
+  .bt .name small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .bt select { width: 100%; }
+  .capture { width: 100%; min-height: 38px; margin-top: 6px; padding: 0 10px; border-radius: 8px; border: 1px dashed var(--accent); background: var(--accent-soft); text-align: center; }
+  .stat { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; font-size: 14px; margin: 0; }
+  .stat dt { color: var(--muted); }
+  .stat dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .battery { display: inline-flex; align-items: center; gap: 6px; }
+  .battery svg { width: 20px; height: 20px; }
+  .log { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--panel-2); border-radius: 8px; padding: 10px; max-height: 260px; overflow: auto; white-space: pre-wrap; margin: 0; }
+  .saved { transition: opacity 0.3s; }
+  @media (max-width: 720px) {
+    .level { grid-template-columns: auto auto minmax(0, 1fr); }
+    .dpi-val { justify-self: end; }
+    .level input[type='range'] { grid-column: 1 / -1; grid-row: 2; }
+    .bt { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="6"/><path d="M12 6v4"/></svg>
+    AJ139 Studio
+  </div>
+  <div class="spacer"></div>
+  <div class="status" id="status"><i class="dot"></i><span>Non connectée</span></div>
+  <button class="btn primary" id="connect">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 7V2M15 7V2M6 7h12v5a6 6 0 0 1-12 0zM12 18v4"/></svg>
+    <span>Connecter</span>
+  </button>
+</header>
+
+<div class="layout">
+  <nav class="side" id="nav" aria-label="Sections">
+    <button data-view="perf" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M3.3 19a9 9 0 1 1 17.4 0"/></svg>Performances</button>
+    <button data-view="sensor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Capteur</button>
+    <button data-view="buttons"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10l-3-3M17 17H7l3 3"/></svg>Boutons</button>
+    <button data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Réglages</button>
+    <button data-view="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>Système</button>
+  </nav>
+
+  <main id="main">
+    <div id="banner"></div>
+
+    <section class="view active" id="view-perf">
+      <h1>Performances</h1>
+      <p class="lead">Six paliers DPI, parcourus avec le bouton DPI. Le palier coché est celui utilisé.</p>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Paliers DPI</h2>
+          <div class="levels" id="levels"></div>
+          <p class="note">50 à 26 000 DPI, par pas de 50. La pastille de couleur règle le témoin au-dessus de la molette.</p>
+        </div>
+        <div class="card">
+          <div class="field"><div class="label">Taux de rapport</div><div class="seg" id="rate"></div></div>
+          <p class="note">Au-delà de 1000 Hz, la batterie se vide plus vite.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-sensor">
+      <h1>Capteur</h1>
+      <div class="card">
+        <div class="field"><div class="label">Distance de décollage (LOD)</div><div class="seg" id="lod"></div></div>
+        <div class="field"><label class="switch"><input type="checkbox" id="motion-sync"> Motion Sync</label><div class="note">Aligne les mesures du capteur sur les rapports USB : mouvement plus régulier, un peu plus de latence.</div></div>
+        <div class="field"><label class="switch"><input type="checkbox" id="angle-snap"> Correction d'angle</label><div class="note">Redresse les tracés presque horizontaux ou verticaux.</div></div>
+        <div class="field"><label class="switch"><input type="checkbox" id="ripple"> Lissage (ripple control)</label><div class="note">Réduit le bruit du capteur au-dessus de 9000 DPI.</div></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-buttons">
+      <h1>Boutons</h1>
+      <p class="lead">Fonction de chaque bouton. Le clic gauche reste verrouillé pour ne jamais perdre la main.</p>
+      <div class="card">
+        <div class="buttons" id="buttons"></div>
+        <div class="field row"><button class="btn" id="keys-reset">Boutons d'origine</button><span class="note" id="keys-note"></span></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <h1>Réglages</h1>
+      <div class="grid-2">
+        <div class="card">
+          <div class="field"><div class="label">Anti-rebond des clics : <b id="debounce-v"></b></div><input type="range" id="debounce" min="0" max="20" step="1"></div>
+          <div class="field"><div class="label">Mise en veille après</div><div class="seg" id="sleep"></div></div>
+          <div class="field"><label class="switch"><input type="checkbox" id="esports"> Mode e-sport</label><div class="note">Capteur toujours actif : réactivité maximale, autonomie réduite.</div></div>
+          <div class="field"><label class="switch"><input type="checkbox" id="wake"> Réveil en bougeant la souris</label></div>
+          <div class="field"><label class="switch"><input type="checkbox" id="scroll"> Inverser la molette</label></div>
+        </div>
+        <div class="card">
+          <div class="field"><label for="light">Éclairage du témoin</label><select id="light"></select></div>
+          <p class="note">Le témoin au-dessus de la molette prend la couleur du palier DPI.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-system">
+      <h1>Système</h1>
+      <div class="grid-2">
+        <div class="card">
+          <dl class="stat" id="info"></dl>
+          <div class="field row">
+            <button class="btn" id="reload">Relire la souris</button>
+            <button class="btn" id="export">Exporter les réglages</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Journal USB</h2>
+          <pre class="log" id="log"></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
