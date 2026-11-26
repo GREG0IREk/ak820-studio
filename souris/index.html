@@ -34,7 +34,9 @@
   .battery { display: inline-flex; align-items: center; gap: 6px; }
   .battery svg { width: 20px; height: 20px; }
   .log { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--panel-2); border-radius: 8px; padding: 10px; max-height: 260px; overflow: auto; white-space: pre-wrap; margin: 0; }
-  .saved { transition: opacity 0.3s; }
+  .field > label.switch { display: inline-flex; font-size: inherit; color: inherit; margin-bottom: 0; }
+  .field > label.switch + .note { margin-top: 4px; padding-left: 46px; }
+  .buttons + .field { margin-top: 16px; }
   @media (max-width: 720px) {
     .level { grid-template-columns: auto auto minmax(0, 1fr); }
     .dpi-val { justify-self: end; }
@@ -87,6 +89,7 @@
 
     <section class="view" id="view-sensor">
       <h1>Capteur</h1>
+      <p class="lead">Chaque changement est enregistré dans la souris.</p>
       <div class="card">
         <div class="field"><div class="label">Distance de décollage (LOD)</div><div class="seg" id="lod"></div></div>
         <div class="field"><label class="switch"><input type="checkbox" id="motion-sync"> Motion Sync</label><div class="note">Aligne les mesures du capteur sur les rapports USB : mouvement plus régulier, un peu plus de latence.</div></div>
@@ -106,6 +109,7 @@
 
     <section class="view" id="view-settings">
       <h1>Réglages</h1>
+      <p class="lead">Chaque changement est enregistré dans la souris.</p>
       <div class="grid-2">
         <div class="card">
           <div class="field"><div class="label">Anti-rebond des clics : <b id="debounce-v"></b></div><input type="range" id="debounce" min="0" max="20" step="1"></div>

@@ -392,7 +392,8 @@ $('#nav').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-view]');
   if (b) showView(b.dataset.view);
 });
-if (location.hash) showView(location.hash.slice(1));
+const startView = new URLSearchParams(location.search).get('vue') || location.hash.slice(1);
+if (startView) showView(startView);
 
 $('#connect').addEventListener('click', connect);
 $('#reload').addEventListener('click', () => link && readAll().then(() => flash('Réglages relus')).catch((e) => banner(e.message, true)));
